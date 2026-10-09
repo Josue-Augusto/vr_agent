@@ -1,0 +1,23 @@
+name: vr_agent
+description: Agente para atualização automática.
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.13.4
+
+# Add regular dependencies here.
+dependencies:
+  path: ^1.9.0
+  compute: ^1.0.2
+
+  # encryption
+  encrypt: ^5.0.3
+  crypto: ^3.0.3
+
+  # Persistence
+  postgres: ^3.5.6
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

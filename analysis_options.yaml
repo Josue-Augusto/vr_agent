@@ -1,0 +1,16 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  
+  errors:
+    always_declare_return_types: warning # Alerta sobre o uso de metodos não tipado
+linter:
+
+  rules:
+    prefer_single_quotes: true # Alerta sobre o uso de aspas duplas
+    prefer_final_locals: true # Alerta sobre o uso de variáveis locais onde foi feito apenas uma atribução
+    avoid_unused_constructor_parameters: true # Alerta sobre o uso de variáveis locais onde foi feito apenas uma atribuição e não foi usada
+    always_declare_return_types: true # Alerta sobre o uso de metodos não tipado
+
+formatter: 
+  trailing_commas: preserve
