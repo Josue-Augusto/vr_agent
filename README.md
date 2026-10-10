@@ -5,18 +5,27 @@ de vida atual do agente. Os comandos abaixo formam a paleta CLI:
 
 ```text
 vr_agent -version
+vr_agent -info
 vr_agent -check
 vr_agent -update
 vr_agent -backup [argumentos adicionais]
 vr_agent -help
 ```
 
-`-version` exibe a versão do agente. `-check`, `-update` e `-backup` encaminham
+`-version` exibe o nome e a versão do agente. `-info` exibe nome, versão e
+plataforma detectada (Windows ou Linux). A plataforma não é impressa
+automaticamente nos demais comandos. `-check`, `-update` e `-backup` encaminham
 a própria flag, além de quaisquer argumentos adicionais, ao executável
 PowerTools localizado junto ao executável do VR Agent (`PowerTools.exe` no
 Windows e `PowerTools` no Linux). O VR Agent repassa a saída e o código de
 retorno do PowerTools. As rotinas de atualização/agenda ainda não estão
 implementadas; por enquanto, esses comandos apenas delegam a execução.
+O sistema operacional é identificado centralmente em `PlatformInfo` no módulo
+`filePath`.
+
+A camada de conexão recebe a configuração como objeto JSON pelo repositório
+`filePath`; a identificação da plataforma, a localização do `.env`, a leitura e
+a descriptografia ficam encapsuladas nesse módulo.
 
 ## Adicionar um comando
 

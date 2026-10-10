@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vr_agent/core/feature/filePath/domain/entities/platform_info.dart';
 import 'package:vr_agent/core/tools/constants.dart';
 
 typedef CommandAction = Future<int> Function(List<String> arguments);
@@ -15,6 +16,14 @@ class AgentCommand {
 class VersionCommand {
   Future<int> call(List<String> arguments) async {
     stdout.writeln('$APP_NAME $VERSION');
+    return 0;
+  }
+}
+
+class InfoCommand {
+  Future<int> call(List<String> arguments) async {
+    stdout.writeln('$APP_NAME $VERSION');
+    stdout.writeln('Plataforma: ${PlatformInfo.current.displayName}');
     return 0;
   }
 }

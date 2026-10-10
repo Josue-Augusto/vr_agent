@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:vr_agent/cli/agent_command.dart';
+import 'package:vr_agent/core/feature/filePath/domain/entities/platform_info.dart';
 
 class CommandRegistry {
   final Map<String, AgentCommand> _commands = {};
@@ -35,8 +36,8 @@ CommandRegistry createDefaultCommandPalette({String? executablePath}) {
   final powerToolsPath =
       executablePath ??
       '${File(Platform.resolvedExecutable).parent.path}'
-          '${Platform.pathSeparator}PowerTools'
-          '${Platform.isWindows ? '.exe' : ''}';
+          '${PlatformInfo.current.pathSeparator}PowerTools'
+          '${PlatformInfo.current.isWindows ? '.exe' : ''}';
   final powerTools = PowerToolsCommand(executable: powerToolsPath);
 
   registry.register(
@@ -44,6 +45,13 @@ CommandRegistry createDefaultCommandPalette({String? executablePath}) {
       name: '-version',
       description: 'Exibe a versão do VR Agent.',
       action: VersionCommand().call,
+    ),
+  );
+  registry.register(
+    AgentCommand(
+      name: '-info',
+      description: 'Exibe informações sobre o VR Agent.',
+      action: InfoCommand().call,
     ),
   );
   registry.register(

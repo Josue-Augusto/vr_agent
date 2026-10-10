@@ -6,12 +6,43 @@ import 'package:test/test.dart';
 import 'package:vr_agent/connection/data/datasources/local_connection_datasource_impl.dart';
 import 'package:vr_agent/connection/data/models/connection_model.dart';
 import 'package:vr_agent/connection/data/repositories/connection_repository_impl.dart';
+import 'package:vr_agent/core/feature/filePath/data/repositories/file_path_repository_impl.dart';
+import 'package:vr_agent/core/feature/filePath/domain/entities/platform_info.dart';
 
 void main() {
   group('connection lifecycle', () {
-    test('uses OS-specific configuration paths', () {
-      expect(connectionConfigPathFor(isWindows: true), r'C:\vr\.env');
-      expect(connectionConfigPathFor(isWindows: false), '/vr/.env');
+    test('resolves configuration paths for each platform', () {
+      expect(
+        FilePathRepositoryImpl.configPathFor(
+          PlatformInfo.fromOperatingSystem('windows'),
+        ),
+        r'C:\vr\.env',
+      );
+      expect(
+        FilePathRepositoryImpl.configPathFor(
+          PlatformInfo.fromOperatingSystem('linux'),
+        ),
+        '/vr/.env',
+      );
+    });
+
+    test('provides names and platform flags from one platform value', () {
+      final windows = PlatformInfo.fromOperatingSystem('windows');
+      final linux = PlatformInfo.fromOperatingSystem('linux');
+
+      expect(windows.displayName, 'Windows');
+      expect(windows.isWindows, isTrue);
+      expect(windows.pathSeparator, r'\');
+      expect(linux.displayName, 'Linux');
+      expect(linux.isLinux, isTrue);
+      expect(linux.pathSeparator, '/');
+    });
+
+    test('rejects platforms other than Windows and Linux', () {
+      expect(
+        () => PlatformInfo.fromOperatingSystem('macos'),
+        throwsA(isA<UnsupportedError>()),
+      );
     });
 
     test('opens a replacement when the current connection is closed', () async {
