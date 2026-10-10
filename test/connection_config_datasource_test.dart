@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:postgres/postgres.dart';
 import 'package:test/test.dart';
-import 'package:vr_agent/connection/data/datasources/local_connection_datasource_impl.dart';
-import 'package:vr_agent/core/feature/filePath/data/repositories/file_path_repository_impl.dart';
+import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
+import 'package:vr_agent/src/core/extensions/string_extension.dart';
+import 'package:vr_agent/src/filePath/data/datasources/local_file_path_datasource.dart';
+import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
 
 void main() {
   test('reads and decrypts the database configuration JSON', () async {
@@ -12,20 +14,24 @@ void main() {
 
     try {
       final configFile = File('${directory.path}/.env');
-      await FilePathRepositoryImpl().writeEncryptedFile(
+      final fileRepository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        configPath: configFile.path,
+      );
+      await LocalFilePathDatasource().writeFile(
         path: configFile.path,
-        content: jsonEncode({
+        content: await jsonEncode({
           'host': 'localhost',
           'port': 5432,
           'database': 'agent',
           'username': 'agent_user',
           'password': 'secret',
           'sslMode': true,
-        }),
+        }).encryptIsolate(),
       );
 
       final config = await OpenSQLConnection(
-        filePathRepository: FilePathRepositoryImpl(configPath: configFile.path),
+        filePathRepository: fileRepository,
       ).getConfig();
 
       expect(config.host, 'localhost');
@@ -44,13 +50,17 @@ void main() {
 
     try {
       final configFile = File('${directory.path}/.env');
-      await FilePathRepositoryImpl().writeEncryptedFile(
+      final fileRepository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        configPath: configFile.path,
+      );
+      await LocalFilePathDatasource().writeFile(
         path: configFile.path,
-        content: 'not-json',
+        content: await 'not-json'.encryptIsolate(),
       );
 
       final datasource = OpenSQLConnection(
-        filePathRepository: FilePathRepositoryImpl(configPath: configFile.path),
+        filePathRepository: fileRepository,
       );
 
       await expectLater(datasource.getConfig(), throwsA(isA<FormatException>()));
@@ -64,12 +74,14 @@ void main() {
 
     try {
       final configFile = File('${directory.path}/.env');
-      await FilePathRepositoryImpl().writeEncryptedFile(
-        path: configFile.path,
-        content: '["not", "an", "object"]',
+      final repository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        configPath: configFile.path,
       );
-
-      final repository = FilePathRepositoryImpl(configPath: configFile.path);
+      await LocalFilePathDatasource().writeFile(
+        path: configFile.path,
+        content: await '["not", "an", "object"]'.encryptIsolate(),
+      );
 
       await expectLater(repository.readConfigJson(), throwsA(isA<FormatException>()));
     } finally {

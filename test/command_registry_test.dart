@@ -1,8 +1,19 @@
 import 'dart:io';
 
+import 'package:postgres/postgres.dart';
 import 'package:test/test.dart';
-import 'package:vr_agent/cli/agent_command.dart';
-import 'package:vr_agent/cli/command_registry.dart';
+import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
+import 'package:vr_agent/src/connection/data/models/connection_model.dart';
+import 'package:vr_agent/src/core/tools/platform_info.dart';
+import 'package:vr_agent/src/di/injection.dart';
+import 'package:vr_agent/src/terminal/data/repositories/power_tools_repository_impl.dart';
+import 'package:vr_agent/src/terminal/domain/entities/agent_command.dart';
+import 'package:vr_agent/src/terminal/domain/entities/power_tools_result.dart';
+import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository.dart';
+import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
+import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
+import 'package:vr_agent/src/terminal/presentation/cli/command_registry.dart';
+import 'package:vr_agent/src/terminal/presentation/cli/power_tools_command.dart';
 
 void main() {
   group('CommandRegistry', () {
@@ -47,9 +58,9 @@ void main() {
     });
   });
 
-  group('PowerToolsCommand', () {
+  group('PowerToolsRepositoryImpl', () {
     test(
-      'forwards flags and returns the PowerTools exit code',
+      'forwards arguments and returns the process exit code',
       () async {
         final directory = await Directory.systemTemp.createTemp();
         final executable = File(
@@ -75,11 +86,12 @@ exit 7
             await Process.run('chmod', ['+x', executable.path]);
           }
 
-          final exitCode = await PowerToolsCommand(
-            executable: executable.path,
-          ).call(['-backup', '--full']);
+          final repository = PowerToolsRepositoryImpl(
+            executablePath: executable.path,
+          );
+          final result = await repository.execute(['-backup', '--full']);
 
-          expect(exitCode, 7);
+          expect(result.exitCode, 7);
           expect(await argumentsFile.readAsLines(), ['-backup', '--full']);
         } finally {
           await directory.delete(recursive: true);
@@ -88,18 +100,77 @@ exit 7
       skip: Platform.isWindows ? 'The test helper is a batch script, not a PowerTools executable.' : false,
     );
 
-    test('reports a missing PowerTools executable', () async {
+    test('reports a missing executable explicitly', () async {
       final directory = await Directory.systemTemp.createTemp();
       try {
-        expect(
-          await PowerToolsCommand(
-            executable: '${directory.path}${Platform.pathSeparator}missing',
-          ).call(['-backup']),
-          1,
+        final repository = PowerToolsRepositoryImpl(
+          executablePath: '${directory.path}${Platform.pathSeparator}missing',
+        );
+
+        await expectLater(
+          repository.execute(['-backup']),
+          throwsA(isA<FileSystemException>()),
         );
       } finally {
         await directory.delete(recursive: true);
       }
     });
   });
+
+  test('PowerTools CLI command delegates to its use case', () async {
+    final repository = _FakePowerToolsRepository();
+    final command = PowerToolsCommand(RunPowerToolsCommand(repository));
+
+    final exitCode = await command.call(['-backup']);
+
+    expect(exitCode, 9);
+    expect(repository.arguments, ['-backup']);
+  });
+
+  test('agent info command gets values through its use case', () async {
+    final getAgentInfo = GetAgentInfo(
+      name: 'VR Agent',
+      version: '1.2.3',
+      platform: 'Linux',
+    );
+
+    expect(getAgentInfo().name, 'VR Agent');
+    expect(getAgentInfo().version, '1.2.3');
+    expect(getAgentInfo().platform, 'Linux');
+  });
+
+  test('dependency injection routes CLI commands through the repository', () async {
+    final repository = _FakePowerToolsRepository();
+    final dependencies = createAppDependencies(
+      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+      connectionDatasource: _UnusedConnectionDatasource(),
+      powerToolsRepository: repository,
+    );
+
+    final exitCode = await dependencies.commandRegistry.run([
+      '-backup',
+      '--full',
+    ]);
+
+    expect(exitCode, 9);
+    expect(repository.arguments, ['-backup', '--full']);
+  });
+}
+
+class _FakePowerToolsRepository implements PowerToolsRepository {
+  List<String>? arguments;
+
+  @override
+  Future<PowerToolsResult> execute(List<String> arguments) async {
+    this.arguments = arguments;
+    return const PowerToolsResult(exitCode: 9, stdout: '', stderr: '');
+  }
+}
+
+class _UnusedConnectionDatasource implements PostgreSQLConnectionDatasource {
+  @override
+  Future<Connection> openConnection({String? user, String? password}) => throw UnimplementedError();
+
+  @override
+  Future<ConnectionModel> getConfig() => throw UnimplementedError();
 }

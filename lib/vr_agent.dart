@@ -1,24 +1,13 @@
-import 'dart:developer' as developer;
-
-import 'package:vr_agent/connection/data/repositories/connection_repository_impl.dart';
-import 'package:vr_agent/connection/domain/repositories/connection_repository.dart';
+import 'package:vr_agent/src/terminal/domain/usecases/close_agent.dart';
+import 'package:vr_agent/src/terminal/domain/usecases/start_agent.dart';
 
 class VRAgent {
-  final ConnectionRepository _connectionRepository;
+  final StartAgent startAgent;
+  final CloseAgent closeAgent;
 
-  VRAgent({ConnectionRepository? connectionRepository}) : _connectionRepository = connectionRepository ?? PostgreSQLConnectionImpl();
+  const VRAgent({required this.startAgent, required this.closeAgent});
 
-  Future<void> start() async {
-    try {
-      await _connectionRepository.init();
-    } catch (error, stackTrace) {
-      developer.log(
-        'Initial PostgreSQL connection failed; automatic reconnection will continue.',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-  }
+  Future<void> start() => startAgent();
 
-  Future<void> close() => _connectionRepository.close();
+  Future<void> close() => closeAgent();
 }

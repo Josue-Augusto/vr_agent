@@ -3,11 +3,11 @@ import 'dart:io';
 
 import 'package:postgres/postgres.dart';
 import 'package:test/test.dart';
-import 'package:vr_agent/connection/data/datasources/local_connection_datasource_impl.dart';
-import 'package:vr_agent/connection/data/models/connection_model.dart';
-import 'package:vr_agent/connection/data/repositories/connection_repository_impl.dart';
-import 'package:vr_agent/core/feature/filePath/data/repositories/file_path_repository_impl.dart';
-import 'package:vr_agent/core/feature/filePath/domain/entities/platform_info.dart';
+import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
+import 'package:vr_agent/src/connection/data/models/connection_model.dart';
+import 'package:vr_agent/src/connection/data/repositories/connection_repository_impl.dart';
+import 'package:vr_agent/src/core/tools/platform_info.dart';
+import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
 
 void main() {
   group('connection lifecycle', () {
