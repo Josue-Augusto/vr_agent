@@ -7,11 +7,9 @@ import 'package:vr_agent/core/feature/filePath/data/repositories/file_path_repos
 import 'package:vr_agent/core/feature/filePath/domain/repositories/file_path_repository.dart';
 import 'package:vr_agent/core/tools/constants.dart';
 
-String get connectionConfigPath =>
-    connectionConfigPathFor(isWindows: Platform.isWindows);
+String get connectionConfigPath => connectionConfigPathFor(isWindows: Platform.isWindows);
 
-String connectionConfigPathFor({required bool isWindows}) =>
-    isWindows ? r'C:\vr\.env' : '/vr/.env';
+String connectionConfigPathFor({required bool isWindows}) => isWindows ? r'C:\vr\.env' : '/vr/.env';
 
 abstract interface class PostgreSQLConnectionDatasource {
   Future<Connection> openConnection({String? user, String? password});
