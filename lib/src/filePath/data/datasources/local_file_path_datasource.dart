@@ -7,12 +7,16 @@ abstract interface class FilePathDatasource {
 
 class LocalFilePathDatasource implements FilePathDatasource {
   @override
-  Future<String> readFile({required String path}) {
-    return File(path).readAsString();
+  Future<String> readFile({required String path}) async {
+    final file = File(path);
+    await file.create(recursive: true);
+    return file.readAsString();
   }
 
   @override
-  Future<void> writeFile({required String path, required String content}) {
-    return File(path).writeAsString(content);
+  Future<void> writeFile({required String path, required String content}) async {
+    final file = File(path);
+    await file.create(recursive: true);
+    await file.writeAsString(content);
   }
 }

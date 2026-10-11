@@ -11,18 +11,18 @@ import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_imp
 
 void main() {
   group('connection lifecycle', () {
-    test('resolves configuration paths for each platform', () {
+    test('resolves configuration directories for each platform', () {
       expect(
-        FilePathRepositoryImpl.configPathFor(
+        FilePathRepositoryImpl.directoryPathFor(
           PlatformInfo.fromOperatingSystem('windows'),
         ),
-        r'C:\vr\.env',
+        r'C:\vr\agent',
       );
       expect(
-        FilePathRepositoryImpl.configPathFor(
+        FilePathRepositoryImpl.directoryPathFor(
           PlatformInfo.fromOperatingSystem('linux'),
         ),
-        '/vr/.env',
+        '/vr/agent',
       );
     });
 

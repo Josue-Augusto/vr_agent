@@ -16,7 +16,7 @@ void main() {
       final configFile = File('${directory.path}/.env');
       final fileRepository = FilePathRepositoryImpl(
         datasource: LocalFilePathDatasource(),
-        configPath: configFile.path,
+        directoryPath: directory.path,
       );
       await LocalFilePathDatasource().writeFile(
         path: configFile.path,
@@ -52,7 +52,7 @@ void main() {
       final configFile = File('${directory.path}/.env');
       final fileRepository = FilePathRepositoryImpl(
         datasource: LocalFilePathDatasource(),
-        configPath: configFile.path,
+        directoryPath: directory.path,
       );
       await LocalFilePathDatasource().writeFile(
         path: configFile.path,
@@ -76,14 +76,62 @@ void main() {
       final configFile = File('${directory.path}/.env');
       final repository = FilePathRepositoryImpl(
         datasource: LocalFilePathDatasource(),
-        configPath: configFile.path,
+        directoryPath: directory.path,
       );
       await LocalFilePathDatasource().writeFile(
         path: configFile.path,
         content: await '["not", "an", "object"]'.encryptIsolate(),
       );
 
-      await expectLater(repository.readConfigJson(), throwsA(isA<FormatException>()));
+      await expectLater(
+        repository.readJson(fileName: '.env'),
+        throwsA(isA<FormatException>()),
+      );
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('writes and reads encrypted JSON using a dynamic file name', () async {
+    final directory = await Directory.systemTemp.createTemp();
+
+    try {
+      final repository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        directoryPath: '${directory.path}/nested',
+      );
+      final data = <String, dynamic>{'setting': 'value', 'enabled': true};
+
+      await repository.writeJson(fileName: 'config.conf', data: data);
+
+      final storedContent = await File(
+        '${directory.path}/nested/config.conf',
+      ).readAsString();
+      expect(storedContent, isNot(contains('"setting"')));
+      expect(await storedContent.decryptIsolate(), jsonEncode(data));
+      expect(await repository.readJson(fileName: 'config.conf'), data);
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('creates the parent directory and file when reading a missing file', () async {
+    final directory = await Directory.systemTemp.createTemp();
+
+    try {
+      final repository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        directoryPath: '${directory.path}/missing/nested',
+      );
+
+      await expectLater(
+        repository.readJson(fileName: 'config.conf'),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        await File('${directory.path}/missing/nested/config.conf').exists(),
+        isTrue,
+      );
     } finally {
       await directory.delete(recursive: true);
     }

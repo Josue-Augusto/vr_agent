@@ -31,7 +31,7 @@ class OpenSQLConnection implements PostgreSQLConnectionDatasource {
 
   @override
   Future<ConnectionModel> getConfig() async {
-    final data = await filePathRepository.readConfigJson();
+    final data = await filePathRepository.readJson(fileName: '.env');
     return ConnectionModel.fromJson(data);
   }
 }
