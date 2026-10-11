@@ -23,6 +23,8 @@ class FilePathRepositoryImpl implements FilePathRepository {
   static String directoryPathFor(PlatformInfo platformInfo) =>
       platformInfo.isWindows ? r'C:\vr\agent' : '/vr/agent';
 
+  String get directoryPath => _directoryPath;
+
   @override
   Future<Map<String, dynamic>> readJson({required String fileName}) async {
     final path = _pathFor(fileName);

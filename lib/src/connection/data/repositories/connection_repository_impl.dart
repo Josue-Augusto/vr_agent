@@ -75,17 +75,23 @@ class PostgreSQLConnectionImpl implements ConnectionRepository {
     return connection;
   }
 
-  Future<Result> execute(Object query, {Object? parameters}) async {
+  @override
+  Future<List<Map<String, dynamic>>> execute(
+    String query, {
+    List<Object?>? parameters,
+  }) async {
     final connection = await getConnection();
     try {
-      return await connection.execute(query, parameters: parameters);
+      final result = await connection.execute(query, parameters: parameters);
+      return result.map((row) => row.toColumnMap()).toList(growable: false);
     } catch (error, stackTrace) {
       if (!_isConnectionFailure(error, connection)) {
         Error.throwWithStackTrace(error, stackTrace);
       }
 
       final recoveredConnection = await _replaceConnection(expected: connection);
-      return recoveredConnection.execute(query, parameters: parameters);
+      final result = await recoveredConnection.execute(query, parameters: parameters);
+      return result.map((row) => row.toColumnMap()).toList(growable: false);
     }
   }
 

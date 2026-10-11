@@ -6,5 +6,8 @@ class RunPowerToolsCommand {
 
   const RunPowerToolsCommand(this._repository);
 
-  Future<PowerToolsResult> call(List<String> arguments) => _repository.execute(arguments);
+  Future<PowerToolsResult> call(
+    List<String> arguments, {
+    Duration? timeout,
+  }) => _repository.execute(arguments, timeout: timeout);
 }

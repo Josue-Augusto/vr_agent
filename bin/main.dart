@@ -10,15 +10,20 @@ Future<void> main(List<String> arguments) async {
     final agent = VRAgent(
       startAgent: dependencies.startAgent,
       closeAgent: dependencies.closeAgent,
+      startScheduler: dependencies.crontabScheduler.start,
+      closeScheduler: dependencies.crontabScheduler.close,
     );
     try {
       await agent.start();
     } catch (error, stackTrace) {
       developer.log(
-        'Initial PostgreSQL connection failed; automatic reconnection will continue.',
+        'VR Agent startup failed.',
         error: error,
         stackTrace: stackTrace,
       );
+      await dependencies.crontabScheduler.close();
+      await dependencies.closeAgent();
+      io.exitCode = 1;
     }
     return;
   }

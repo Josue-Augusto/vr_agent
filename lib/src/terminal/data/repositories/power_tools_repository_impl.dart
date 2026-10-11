@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:vr_agent/src/terminal/domain/entities/power_tools_result.dart';
@@ -9,7 +11,10 @@ class PowerToolsRepositoryImpl implements PowerToolsRepository {
   const PowerToolsRepositoryImpl({required this.executablePath});
 
   @override
-  Future<PowerToolsResult> execute(List<String> arguments) async {
+  Future<PowerToolsResult> execute(
+    List<String> arguments, {
+    Duration? timeout,
+  }) async {
     final executable = File(executablePath);
     if (!await executable.exists()) {
       throw FileSystemException(
@@ -18,16 +23,31 @@ class PowerToolsRepositoryImpl implements PowerToolsRepository {
       );
     }
 
-    final result = await Process.run(
+    final process = await Process.start(
       executable.path,
       arguments,
       workingDirectory: executable.parent.path,
       runInShell: false,
     );
+    final stdoutFuture = process.stdout.transform(utf8.decoder).join();
+    final stderrFuture = process.stderr.transform(utf8.decoder).join();
+    var timedOut = false;
+    final exitCodeFuture = process.exitCode;
+    final exitCode = timeout == null
+        ? await exitCodeFuture
+        : await exitCodeFuture.timeout(
+            timeout,
+            onTimeout: () {
+              timedOut = true;
+              process.kill();
+              return exitCodeFuture;
+            },
+          );
     return PowerToolsResult(
-      exitCode: result.exitCode,
-      stdout: result.stdout as String,
-      stderr: result.stderr as String,
+      exitCode: exitCode,
+      stdout: await stdoutFuture,
+      stderr: await stderrFuture,
+      timedOut: timedOut,
     );
   }
 }

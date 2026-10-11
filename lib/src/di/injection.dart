@@ -3,6 +3,11 @@ import 'dart:io';
 import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
 import 'package:vr_agent/src/connection/data/repositories/connection_repository_impl.dart';
 import 'package:vr_agent/src/core/tools/platform_info.dart';
+import 'package:vr_agent/src/crontab/data/repositories/agent_task_command_runner.dart';
+import 'package:vr_agent/src/crontab/data/repositories/postgres_crontab_repository.dart';
+import 'package:vr_agent/src/crontab/data/scheduler/local_crontab_scheduler.dart';
+import 'package:vr_agent/src/crontab/domain/usecases/run_crontab_task.dart';
+import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/filePath/data/datasources/local_file_path_datasource.dart';
 import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
 import 'package:vr_agent/src/terminal/data/constants/app_constants.dart';
@@ -19,6 +24,7 @@ class AppDependencies {
   final CloseAgent closeAgent;
   final GetAgentInfo getAgentInfo;
   final RunPowerToolsCommand runPowerToolsCommand;
+  final LocalCrontabScheduler crontabScheduler;
   final CommandRegistry commandRegistry;
 
   const AppDependencies({
@@ -26,6 +32,7 @@ class AppDependencies {
     required this.closeAgent,
     required this.getAgentInfo,
     required this.runPowerToolsCommand,
+    required this.crontabScheduler,
     required this.commandRegistry,
   });
 }
@@ -64,9 +71,32 @@ AppDependencies createAppDependencies({
     platform: platform.displayName,
   );
   final runPowerToolsCommand = RunPowerToolsCommand(toolsRepository);
+  final crontabRepository = PostgresCrontabRepository(
+    connectionRepository: connectionRepository,
+  );
+  final taskCommandRunner = AgentTaskCommandRunner(
+    powerToolsRepository: toolsRepository,
+    getAgentInfo: getAgentInfo,
+  );
+  final runCrontabTask = RunCrontabTask(
+    crontabRepository: crontabRepository,
+    taskCommandRunner: taskCommandRunner,
+  );
+  final crontabScheduler = LocalCrontabScheduler(
+    filePathRepository: fileRepository,
+    crontabRepository: crontabRepository,
+    runCrontabTask: runCrontabTask,
+  );
+  final syncCrontab = SyncCrontab(
+    filePathRepository: fileRepository,
+    crontabRepository: crontabRepository,
+    connectionRepository: connectionRepository,
+  );
   final commandRegistry = createDefaultCommandPalette(
     getAgentInfo: getAgentInfo,
     runPowerToolsCommand: runPowerToolsCommand,
+    syncCrontab: syncCrontab,
+    filePathRepository: fileRepository,
   );
 
   return AppDependencies(
@@ -74,6 +104,7 @@ AppDependencies createAppDependencies({
     closeAgent: closeAgent,
     getAgentInfo: getAgentInfo,
     runPowerToolsCommand: runPowerToolsCommand,
+    crontabScheduler: crontabScheduler,
     commandRegistry: commandRegistry,
   );
 }

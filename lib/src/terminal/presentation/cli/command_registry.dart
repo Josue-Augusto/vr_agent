@@ -1,8 +1,12 @@
 import 'dart:io';
 
+import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
+import 'package:vr_agent/src/crontab/presentation/cli/crontab_command.dart';
+import 'package:vr_agent/src/crontab/presentation/cli/update_crontab_command.dart';
 import 'package:vr_agent/src/terminal/domain/entities/agent_command.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
+import 'package:vr_agent/src/filePath/domain/repositories/file_path_repository.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/help_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/info_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/power_tools_command.dart';
@@ -39,9 +43,12 @@ class CommandRegistry {
 CommandRegistry createDefaultCommandPalette({
   required GetAgentInfo getAgentInfo,
   required RunPowerToolsCommand runPowerToolsCommand,
+  required SyncCrontab syncCrontab,
+  required FilePathRepository filePathRepository,
 }) {
   final registry = CommandRegistry();
   final powerTools = PowerToolsCommand(runPowerToolsCommand);
+  final updateCrontab = UpdateCrontabCommand(syncCrontab: syncCrontab);
 
   registry.register(
     AgentCommand(
@@ -67,8 +74,20 @@ CommandRegistry createDefaultCommandPalette({
   registry.register(
     AgentCommand(
       name: '-update',
-      description: 'Atualiza o PowerTools.',
-      action: (arguments) => powerTools.call(['-update', ...arguments]),
+      description: 'Atualiza o PowerTools ou use -update -crontab para sincronizar tarefas.',
+      action: (arguments) {
+        if (arguments.isNotEmpty && arguments.first == '-crontab') {
+          return updateCrontab.call(arguments.skip(1).toList(growable: false));
+        }
+        return powerTools.call(['-update', ...arguments]);
+      },
+    ),
+  );
+  registry.register(
+    AgentCommand(
+      name: '-crontab',
+      description: 'Lista as tarefas locais do crontab.',
+      action: CrontabCommand(filePathRepository: filePathRepository).call,
     ),
   );
   registry.register(

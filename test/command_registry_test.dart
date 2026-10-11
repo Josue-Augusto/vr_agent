@@ -115,6 +115,30 @@ exit 7
         await directory.delete(recursive: true);
       }
     });
+
+    test(
+      'kills a PowerTools process that exceeds its timeout',
+      () async {
+        final directory = await Directory.systemTemp.createTemp();
+        final executable = File('${directory.path}/slow.sh');
+        try {
+          await executable.writeAsString('#!/bin/sh\nsleep 5\n');
+          await Process.run('chmod', ['+x', executable.path]);
+
+          final result = await PowerToolsRepositoryImpl(
+            executablePath: executable.path,
+          ).execute(
+            ['-slow'],
+            timeout: const Duration(milliseconds: 100),
+          );
+
+          expect(result.timedOut, isTrue);
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      },
+      skip: Platform.isWindows ? 'The test helper is a shell script.' : false,
+    );
   });
 
   test('PowerTools CLI command delegates to its use case', () async {
@@ -161,7 +185,10 @@ class _FakePowerToolsRepository implements PowerToolsRepository {
   List<String>? arguments;
 
   @override
-  Future<PowerToolsResult> execute(List<String> arguments) async {
+  Future<PowerToolsResult> execute(
+    List<String> arguments, {
+    Duration? timeout,
+  }) async {
     this.arguments = arguments;
     return const PowerToolsResult(exitCode: 9, stdout: '', stderr: '');
   }

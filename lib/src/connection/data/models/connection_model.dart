@@ -19,13 +19,13 @@ class ConnectionModel {
   });
 
   factory ConnectionModel.fromJson(Map<String, dynamic> json) {
-    final sslEnabled = json['sslMode'] == true;
+    final sslEnabled = json['remotesslMode'] == true;
     return ConnectionModel(
-      host: (json['host'] ?? 'localhost') as String,
-      port: (json['port'] ?? 5432) as int,
-      database: (json['database'] ?? '') as String,
-      username: (json['username'] ?? '') as String,
-      password: (json['password'] ?? '') as String,
+      host: (json['remotehost'] ?? 'localhost') as String,
+      port: (json['remoteport'] ?? 5432) as int,
+      database: (json['remotedatabase'] ?? '') as String,
+      username: (json['remoteusername'] ?? '') as String,
+      password: (json['remotepassword'] ?? '') as String,
       sslMode: sslEnabled ? SslMode.require : SslMode.disable,
     );
   }
@@ -54,12 +54,12 @@ class ConnectionModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'host': host,
-      'port': port,
-      'database': database,
-      'username': username,
-      'password': password,
-      'sslMode': sslMode == SslMode.require,
+      'remotehost': host,
+      'remoteport': port,
+      'remotedatabase': database,
+      'remoteusername': username,
+      'remotepassword': password,
+      'remotesslMode': sslMode == SslMode.require,
     };
   }
 

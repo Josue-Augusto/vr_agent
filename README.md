@@ -8,6 +8,8 @@ vr_agent -version
 vr_agent -info
 vr_agent -check
 vr_agent -update
+vr_agent -update -crontab
+vr_agent -crontab
 vr_agent -backup [argumentos adicionais]
 vr_agent -help
 ```
@@ -18,14 +20,23 @@ automaticamente nos demais comandos. `-check`, `-update` e `-backup` encaminham
 a própria flag, além de quaisquer argumentos adicionais, ao executável
 PowerTools localizado junto ao executável do VR Agent (`PowerTools.exe` no
 Windows e `PowerTools` no Linux). O VR Agent repassa a saída e o código de
-retorno do PowerTools. As rotinas de atualização/agenda ainda não estão
-implementadas; por enquanto, esses comandos apenas delegam a execução.
+retorno do PowerTools. `-update -crontab` sincroniza as tarefas do servidor
+configurado em `.env` para o arquivo criptografado `.crontab`; `-crontab` lista
+as tarefas locais. No modo contínuo (sem argumentos), o agente executa as
+tarefas habilitadas no `.crontab` conforme expressões cron de cinco campos e
+seus fusos IANA. O comando da tarefa começa com `a` para comandos nativos
+suportados pelo agente (`a -version`, `a -info`) ou `p` para encaminhar a flag
+ao PowerTools (`p -backup`). Cada tentativa e suas saídas são registradas em
+`agent_task_runs`; estado e erros recentes são atualizados em `agent_tasks`.
+Sincronize o arquivo com `-update -crontab` antes de iniciar o modo contínuo.
+Tarefas com `run_as_user` definido falham explicitamente, pois essa opção ainda
+não é suportada.
 O sistema operacional é identificado centralmente por `PlatformInfo`, no
 serviço de plataforma da camada `data`.
 
-A camada de conexão recebe a configuração como objeto JSON pelo contrato
-`FilePathRepository`; a localização do `.env`, leitura, descriptografia e
-decodificação ficam encapsuladas na implementação em `data`.
+A camada de conexão solicita `.env` pelo contrato `FilePathRepository`; a
+implementação do repositório determina o diretório base e encapsula leitura,
+descriptografia e decodificação JSON.
 
 ## Adicionar um comando
 
