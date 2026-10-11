@@ -1,7 +1,7 @@
 import 'package:postgres/postgres.dart';
+import 'package:vr_agent/core/constants/app_constants.dart';
 import 'package:vr_agent/src/connection/data/models/connection_model.dart';
 import 'package:vr_agent/src/filePath/domain/repositories/file_path_repository.dart';
-import 'package:vr_agent/src/terminal/data/constants/app_constants.dart';
 
 abstract interface class PostgreSQLConnectionDatasource {
   Future<Connection> openConnection({String? user, String? password});

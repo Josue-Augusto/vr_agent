@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:vr_agent/core/constants/app_constants.dart';
 import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
 import 'package:vr_agent/src/connection/data/repositories/connection_repository_impl.dart';
 import 'package:vr_agent/src/core/tools/platform_info.dart';
@@ -10,7 +11,6 @@ import 'package:vr_agent/src/crontab/domain/usecases/run_crontab_task.dart';
 import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/filePath/data/datasources/local_file_path_datasource.dart';
 import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
-import 'package:vr_agent/src/terminal/data/constants/app_constants.dart';
 import 'package:vr_agent/src/terminal/data/repositories/power_tools_repository_impl.dart';
 import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/close_agent.dart';
