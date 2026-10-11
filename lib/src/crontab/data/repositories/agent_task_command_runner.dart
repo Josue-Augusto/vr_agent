@@ -19,15 +19,15 @@ class AgentTaskCommandRunner implements TaskCommandRunner {
       throw UnsupportedError('run_as_user ainda não é suportado pelo agente.');
     }
     final parts = task.command.trim().split(RegExp(r'\s+'));
-    if (parts.length < 2 || (parts.first != 'a' && parts.first != 'p')) {
+    if (parts.length < 2 || (parts.first != '-a' && parts.first != '-p')) {
       throw FormatException(
-        'O comando da tarefa deve começar com "a" (Agent) ou "p" (PowerTools): ${task.command}',
+        'O comando da tarefa deve começar com "-a" (Agent) ou "-p" (PowerTools): ${task.command}',
       );
     }
 
     final command = parts[1];
     final arguments = parts.skip(2).toList(growable: false);
-    if (parts.first == 'p') {
+    if (parts.first == '-p') {
       final result = await powerToolsRepository.execute([
         command,
         ...arguments,
