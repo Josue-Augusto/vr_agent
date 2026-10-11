@@ -9,7 +9,7 @@ class CrontabCommand {
 
   Future<int> call(List<String> arguments) async {
     if (arguments.isNotEmpty) {
-      stderr.writeln('Uso: vr_agent -crontab');
+      stderr.writeln('Uso: vr_agent -a -crontab');
       return 64;
     }
     try {

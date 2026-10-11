@@ -8,11 +8,12 @@ class HelpCommand {
   const HelpCommand(this.commands);
 
   Future<int> call(List<String> arguments) async {
-    stdout.writeln('Uso: vr_agent <comando> [argumentos]');
+    stdout.writeln('Uso: vr_agent <-a|-p> <flag> [argumentos]');
     stdout.writeln();
     for (final command in commands()) {
-      stdout.writeln('  ${command.name.padRight(12)} ${command.description}');
+      stdout.writeln('  ${('-a ${command.name}').padRight(20)} ${command.description}');
     }
+    stdout.writeln('  ${'-p <flag>'.padRight(20)} Encaminha a flag e os argumentos ao PowerTools.');
     return 0;
   }
 }

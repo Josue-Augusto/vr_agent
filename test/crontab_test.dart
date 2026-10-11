@@ -47,7 +47,7 @@ void main() {
         'id': 3,
         'server_id': 42,
         'name': 'task',
-        'command': 'a -version',
+        'command': '-a -version',
         'schedule': '* * * * *',
       });
 
@@ -60,7 +60,7 @@ void main() {
           'id': 3,
           'server_id': 42,
           'name': 'task',
-          'command': 'a -version',
+          'command': '-a -version',
           'schedule': '* * * * *',
           'timeout_seconds': 0,
         }),
@@ -109,7 +109,7 @@ void main() {
       filePathRepository: filePath,
     );
 
-    expect(await registry.run(['-update', '-crontab']), 0);
+    expect(await registry.run(['-a', '-update', '-crontab']), 0);
     expect(database.requestedServerId, 42);
     expect(filePath.writeFileName, '.crontab');
   });
@@ -123,7 +123,7 @@ void main() {
         version: '1.0.0',
         platform: 'Linux',
       ),
-    ).run(_task(command: 'p -backup --full'));
+    ).run(_task(command: '-p -backup --full'));
 
     expect(powerTools.arguments, ['-backup', '--full']);
     expect(powerTools.timeout, const Duration(seconds: 300));
@@ -139,7 +139,7 @@ void main() {
         version: '1.0.0',
         platform: 'Linux',
       ),
-    ).run(_task(command: 'a -version'));
+    ).run(_task(command: '-a -version'));
 
     expect(result.exitCode, 0);
     expect(result.stdout, contains('VR Agent'));
@@ -161,7 +161,7 @@ void main() {
 }
 
 AgentTask _task({
-  String command = 'a -version',
+  String command = '-a -version',
   int maxRetries = 0,
   int retryDelaySeconds = 60,
 }) => AgentTask(

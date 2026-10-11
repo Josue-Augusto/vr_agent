@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/crontab_command.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/update_crontab_command.dart';
+import 'package:vr_agent/src/filePath/domain/repositories/file_path_repository.dart';
 import 'package:vr_agent/src/terminal/domain/entities/agent_command.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
-import 'package:vr_agent/src/filePath/domain/repositories/file_path_repository.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/help_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/info_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/power_tools_command.dart';
@@ -14,6 +14,9 @@ import 'package:vr_agent/src/terminal/presentation/cli/version_command.dart';
 
 class CommandRegistry {
   final Map<String, AgentCommand> _commands = {};
+  final CommandAction? _powerToolsAction;
+
+  CommandRegistry({this._powerToolsAction});
 
   void register(AgentCommand command) {
     if (_commands.containsKey(command.name)) {
@@ -29,14 +32,37 @@ class CommandRegistry {
       return _commands['-help']!.action(const []);
     }
 
-    final command = _commands[arguments.first];
-    if (command == null) {
-      stderr.writeln('Comando desconhecido: ${arguments.first}');
+    final mode = arguments.first;
+    if (mode != '-a' && mode != '-p') {
+      stderr.writeln('O comando deve começar com "-a" (Agent) ou "-p" (PowerTools).');
+      await _commands['-help']!.action(const []);
+      return 64;
+    }
+    if (arguments.length < 2 || !arguments[1].startsWith('-')) {
+      stderr.writeln('Informe a flag do comando após "$mode".');
       await _commands['-help']!.action(const []);
       return 64;
     }
 
-    return command.action(arguments.skip(1).toList(growable: false));
+    final commandName = arguments[1];
+    final commandArguments = arguments.skip(2).toList(growable: false);
+    if (mode == '-p') {
+      final powerToolsAction = _powerToolsAction;
+      if (powerToolsAction == null) {
+        stderr.writeln('A execução do PowerTools não está configurada.');
+        return 1;
+      }
+      return powerToolsAction([commandName, ...commandArguments]);
+    }
+
+    final command = _commands[commandName];
+    if (command == null) {
+      stderr.writeln('Comando do agente desconhecido: $commandName');
+      await _commands['-help']!.action(const []);
+      return 64;
+    }
+
+    return command.action(commandArguments);
   }
 }
 
@@ -46,8 +72,8 @@ CommandRegistry createDefaultCommandPalette({
   required SyncCrontab syncCrontab,
   required FilePathRepository filePathRepository,
 }) {
-  final registry = CommandRegistry();
   final powerTools = PowerToolsCommand(runPowerToolsCommand);
+  final registry = CommandRegistry(powerToolsAction: powerTools.call);
   final updateCrontab = UpdateCrontabCommand(syncCrontab: syncCrontab);
 
   registry.register(
@@ -66,20 +92,14 @@ CommandRegistry createDefaultCommandPalette({
   );
   registry.register(
     AgentCommand(
-      name: '-check',
-      description: 'Verifica atualizações do PowerTools.',
-      action: (arguments) => powerTools.call(['-check', ...arguments]),
-    ),
-  );
-  registry.register(
-    AgentCommand(
       name: '-update',
-      description: 'Atualiza o PowerTools ou use -update -crontab para sincronizar tarefas.',
+      description: 'Use -a -update -crontab para sincronizar tarefas.',
       action: (arguments) {
-        if (arguments.isNotEmpty && arguments.first == '-crontab') {
+        if (arguments.length == 1 && arguments.first == '-crontab') {
           return updateCrontab.call(arguments.skip(1).toList(growable: false));
         }
-        return powerTools.call(['-update', ...arguments]);
+        stderr.writeln('Uso: vr_agent -a -update -crontab');
+        return Future.value(64);
       },
     ),
   );
@@ -88,13 +108,6 @@ CommandRegistry createDefaultCommandPalette({
       name: '-crontab',
       description: 'Lista as tarefas locais do crontab.',
       action: CrontabCommand(filePathRepository: filePathRepository).call,
-    ),
-  );
-  registry.register(
-    AgentCommand(
-      name: '-backup',
-      description: 'Executa o backup do banco de dados.',
-      action: (arguments) => powerTools.call(['-backup', ...arguments]),
     ),
   );
   registry.register(

@@ -38,7 +38,12 @@ void main() {
         ),
       );
 
-      final exitCode = await registry.run(['-custom', '--target', 'nightly']);
+      final exitCode = await registry.run([
+        '-a',
+        '-custom',
+        '--target',
+        'nightly',
+      ]);
 
       expect(exitCode, 7);
       expect(receivedArguments, ['--target', 'nightly']);
@@ -54,7 +59,38 @@ void main() {
         ),
       );
 
-      expect(await registry.run(['-missing']), 64);
+      expect(await registry.run(['-a', '-missing']), 64);
+    });
+
+    test('requires an explicit execution mode', () async {
+      final registry = CommandRegistry();
+      registry.register(
+        AgentCommand(
+          name: '-help',
+          description: 'Help',
+          action: (_) async => 0,
+        ),
+      );
+
+      expect(await registry.run(['-info']), 64);
+    });
+
+    test('PowerTools mode forwards the requested flag and arguments', () async {
+      final repository = _FakePowerToolsRepository();
+      final registry = CommandRegistry(
+        powerToolsAction: PowerToolsCommand(
+          RunPowerToolsCommand(repository),
+        ).call,
+      );
+
+      final exitCode = await registry.run([
+        '-p',
+        '-info',
+        '--details',
+      ]);
+
+      expect(exitCode, 9);
+      expect(repository.arguments, ['-info', '--details']);
     });
   });
 
@@ -172,6 +208,7 @@ exit 7
     );
 
     final exitCode = await dependencies.commandRegistry.run([
+      '-p',
       '-backup',
       '--full',
     ]);
