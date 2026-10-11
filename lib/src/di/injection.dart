@@ -9,6 +9,7 @@ import 'package:vr_agent/src/crontab/domain/usecases/run_crontab_task.dart';
 import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/filePath/data/datasources/local_file_path_datasource.dart';
 import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
+import 'package:vr_agent/src/install/domain/usecases/install_power_tools.dart';
 import 'package:vr_agent/src/terminal/data/repositories/power_tools_repository_impl.dart';
 import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/close_agent.dart';
@@ -72,6 +73,17 @@ AppDependencies createAppDependencies({
     executablePath: executablePath,
     platform: platform,
   );
+  final installPowerTools = InstallPowerTools(
+    connectionRepository: connectionRepository,
+    filePathRepository: fileRepository,
+    updateRepository: PostgresPowerToolsUpdateRepository(
+      connectionRepository: connectionRepository,
+    ),
+    binaryInstaller:
+        powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
+    executablePath: executablePath,
+    platform: platform,
+  );
   final startAgent = StartAgent(connectionRepository);
   final closeAgent = CloseAgent(connectionRepository);
   final getAgentInfo = GetAgentInfo(
@@ -107,6 +119,7 @@ AppDependencies createAppDependencies({
     syncCrontab: syncCrontab,
     filePathRepository: fileRepository,
     updatePowerTools: updatePowerTools,
+    installPowerTools: installPowerTools,
   );
 
   return AppDependencies(

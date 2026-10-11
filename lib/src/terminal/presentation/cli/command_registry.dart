@@ -4,6 +4,8 @@ import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/crontab_command.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/update_crontab_command.dart';
 import 'package:vr_agent/src/filePath/domain/repositories/file_path_repository.dart';
+import 'package:vr_agent/src/install/domain/usecases/install_power_tools.dart';
+import 'package:vr_agent/src/install/presentation/cli/install_power_tools_command.dart';
 import 'package:vr_agent/src/terminal/domain/entities/agent_command.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
@@ -40,7 +42,7 @@ class CommandRegistry {
       await _commands['-help']!.action(const []);
       return 64;
     }
-    if (arguments.length < 2 || !arguments[1].startsWith('-')) {
+    if (arguments.length < 2 || (!arguments[1].startsWith('-') && !(mode == '-a' && arguments[1] == '-install'))) {
       stderr.writeln('Informe a flag do comando após "$mode".');
       await _commands['-help']!.action(const []);
       return 64;
@@ -74,13 +76,13 @@ CommandRegistry createDefaultCommandPalette({
   required SyncCrontab syncCrontab,
   required FilePathRepository filePathRepository,
   UpdatePowerTools? updatePowerTools,
+  InstallPowerTools? installPowerTools,
 }) {
   final powerTools = PowerToolsCommand(runPowerToolsCommand);
   final registry = CommandRegistry(powerToolsAction: powerTools.call);
   final updateCrontab = UpdateCrontabCommand(syncCrontab: syncCrontab);
-  final updatePowerToolsCommand = updatePowerTools == null
-      ? null
-      : UpdatePowerToolsCommand(updatePowerTools);
+  final updatePowerToolsCommand = updatePowerTools == null ? null : UpdatePowerToolsCommand(updatePowerTools);
+  final installPowerToolsCommand = installPowerTools == null ? null : InstallPowerToolsCommand(installPowerTools);
 
   registry.register(
     AgentCommand(
@@ -98,9 +100,22 @@ CommandRegistry createDefaultCommandPalette({
   );
   registry.register(
     AgentCommand(
+      name: '-install',
+      description: 'Baixa e instala o PowerTools se ainda não estiver instalado.',
+      action: (arguments) {
+        final command = installPowerToolsCommand;
+        if (command == null) {
+          stderr.writeln('A instalação do PowerTools não está configurada.');
+          return Future.value(1);
+        }
+        return command.call(arguments);
+      },
+    ),
+  );
+  registry.register(
+    AgentCommand(
       name: '-update',
-      description:
-          'Atualiza o PowerTools; use -a -update -crontab para sincronizar tarefas.',
+      description: 'Atualiza o PowerTools; use -a -update -crontab para sincronizar tarefas.',
       action: (arguments) async {
         if (arguments.isEmpty) {
           final command = updatePowerToolsCommand;

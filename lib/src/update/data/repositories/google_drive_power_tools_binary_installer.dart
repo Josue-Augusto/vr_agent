@@ -13,6 +13,10 @@ class GoogleDrivePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller 
   GoogleDrivePowerToolsBinaryInstaller({Dio? dio}) : _dio = dio ?? Dio();
 
   @override
+  Future<bool> isInstalled({required String executablePath}) =>
+      File(executablePath).exists();
+
+  @override
   Future<void> install({
     required String repositoryUrl,
     required String executablePath,

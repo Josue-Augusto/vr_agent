@@ -8,7 +8,7 @@ class HelpCommand {
   const HelpCommand(this.commands);
 
   Future<int> call(List<String> arguments) async {
-    stdout.writeln('Uso: vr_agent <-a|-p> <flag> [argumentos]');
+    stdout.writeln('Uso: vr_agent <-a|-p> <comando|flag> [argumentos]');
     stdout.writeln();
     for (final command in commands()) {
       stdout.writeln('  ${('-a ${command.name}').padRight(20)} ${command.description}');

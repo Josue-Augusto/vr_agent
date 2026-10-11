@@ -439,6 +439,10 @@ class _FakePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller {
   String? repositoryUrl;
   String? executablePath;
   Object? error;
+  bool installed = false;
+
+  @override
+  Future<bool> isInstalled({required String executablePath}) async => installed;
 
   @override
   Future<void> install({
