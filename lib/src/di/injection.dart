@@ -16,6 +16,10 @@ import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/start_agent.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/command_registry.dart';
+import 'package:vr_agent/src/update/data/repositories/google_drive_power_tools_binary_installer.dart';
+import 'package:vr_agent/src/update/data/repositories/postgres_power_tools_update_repository.dart';
+import 'package:vr_agent/src/update/domain/repositories/power_tools_binary_installer.dart';
+import 'package:vr_agent/src/update/domain/usecases/update_power_tools.dart';
 
 class AppDependencies {
   final StartAgent startAgent;
@@ -40,6 +44,7 @@ AppDependencies createAppDependencies({
   PostgreSQLConnectionDatasource? connectionDatasource,
   FilePathDatasource? filePathDatasource,
   PowerToolsRepository? powerToolsRepository,
+  PowerToolsBinaryInstaller? powerToolsBinaryInstaller,
   Duration healthCheckInterval = const Duration(seconds: 30),
 }) {
   final platform = platformInfo ?? PlatformInfo.current;
@@ -55,9 +60,18 @@ AppDependencies createAppDependencies({
   final executablePath = PowerToolsRepositoryImpl.defaultExecutablePath(
     platform,
   );
-  final toolsRepository =
-      powerToolsRepository ??
-      PowerToolsRepositoryImpl(executablePath: executablePath);
+  final toolsRepository = powerToolsRepository ?? PowerToolsRepositoryImpl(executablePath: executablePath);
+  final updatePowerTools = UpdatePowerTools(
+    connectionRepository: connectionRepository,
+    filePathRepository: fileRepository,
+    powerToolsRepository: toolsRepository,
+    updateRepository: PostgresPowerToolsUpdateRepository(
+      connectionRepository: connectionRepository,
+    ),
+    binaryInstaller: powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
+    executablePath: executablePath,
+    platform: platform,
+  );
   final startAgent = StartAgent(connectionRepository);
   final closeAgent = CloseAgent(connectionRepository);
   final getAgentInfo = GetAgentInfo(
@@ -92,6 +106,7 @@ AppDependencies createAppDependencies({
     runPowerToolsCommand: runPowerToolsCommand,
     syncCrontab: syncCrontab,
     filePathRepository: fileRepository,
+    updatePowerTools: updatePowerTools,
   );
 
   return AppDependencies(
