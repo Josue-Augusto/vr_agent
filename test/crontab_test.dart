@@ -131,6 +131,36 @@ void main() {
     expect(result.succeeded, isTrue);
   });
 
+  test('stores PowerTools output and exit code in the scheduled task run', () async {
+    final database = _FakeCrontabRepository();
+    final powerTools = _FakePowerToolsRepository()
+      ..result = const PowerToolsResult(
+        exitCode: 0,
+        stdout: 'Backup simulado.',
+        stderr: 'Aviso simulado.',
+      );
+    final runner = AgentTaskCommandRunner(
+      powerToolsRepository: powerTools,
+      getAgentInfo: GetAgentInfo(
+        name: 'VR Agent',
+        version: '1.0.0',
+        platform: 'Linux',
+      ),
+    );
+
+    await RunCrontabTask(
+      crontabRepository: database,
+      taskCommandRunner: runner,
+    )(_task(command: '-p -backup'));
+
+    expect(powerTools.arguments, ['-backup']);
+    expect(database.finishedRuns, hasLength(1));
+    expect(database.finishedRuns.single['status'], 'success');
+    expect(database.finishedRuns.single['exitCode'], 0);
+    expect(database.finishedRuns.single['stdout'], 'Backup simulado.');
+    expect(database.finishedRuns.single['stderr'], 'Aviso simulado.');
+  });
+
   test('agent task prefix runs native agent version action', () async {
     final result = await AgentTaskCommandRunner(
       powerToolsRepository: _FakePowerToolsRepository(),
@@ -207,6 +237,7 @@ class _FakeCrontabRepository implements CrontabRepository {
   int? requestedServerId;
   final List<int> startedAttempts = [];
   final List<String> finishedStatuses = [];
+  final List<Map<String, Object?>> finishedRuns = [];
 
   @override
   Future<List<AgentTask>> getTasksForServer(int serverId) async {
@@ -236,6 +267,15 @@ class _FakeCrontabRepository implements CrontabRepository {
     required String? errorMessage,
   }) async {
     finishedStatuses.add(status);
+    finishedRuns.add({
+      'runId': runId,
+      'taskId': task.id,
+      'status': status,
+      'exitCode': exitCode,
+      'stdout': stdout,
+      'stderr': stderr,
+      'errorMessage': errorMessage,
+    });
   }
 }
 
@@ -272,6 +312,11 @@ class _FakeConnectionRepository implements ConnectionRepository {
 class _FakePowerToolsRepository implements PowerToolsRepository {
   List<String>? arguments;
   Duration? timeout;
+  PowerToolsResult result = const PowerToolsResult(
+    exitCode: 0,
+    stdout: 'captured output',
+    stderr: '',
+  );
 
   @override
   Future<PowerToolsResult> execute(
@@ -280,11 +325,7 @@ class _FakePowerToolsRepository implements PowerToolsRepository {
   }) async {
     this.arguments = arguments;
     this.timeout = timeout;
-    return const PowerToolsResult(
-      exitCode: 0,
-      stdout: 'captured output',
-      stderr: '',
-    );
+    return result;
   }
 }
 

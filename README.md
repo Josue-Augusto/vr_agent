@@ -10,7 +10,7 @@ vr_agent -p -check
 vr_agent -p -update
 vr_agent -a -update -crontab
 vr_agent -a -crontab
-vr_agent -p -backup [argumentos adicionais]
+vr_agent -p -backup
 vr_agent -a -help
 ```
 
@@ -27,7 +27,9 @@ tarefas habilitadas no `.crontab` conforme expressões cron de cinco campos e
 seus fusos IANA. O comando da tarefa começa com `-a` para comandos nativos
 suportados pelo agente (`-a -version`, `-a -info`) ou `-p` para encaminhar a flag
 ao PowerTools (`-p -backup`). Cada tentativa e suas saídas são registradas em
-`agent_task_runs`; estado e erros recentes são atualizados em `agent_tasks`.
+`agent_task_runs` quando iniciadas pelo agendador; estado e erros recentes são
+atualizados em `agent_tasks`. Chamadas `-p` feitas diretamente na CLI exibem a
+resposta do PowerTools, mas não criam um registro de tarefa agendada.
 Sincronize o arquivo com `-a -update -crontab` antes de iniciar o modo contínuo.
 Tarefas com `run_as_user` definido falham explicitamente, pois essa opção ainda
 não é suportada.
