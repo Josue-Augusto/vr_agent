@@ -18,9 +18,9 @@ Todos os comandos CLI devem indicar o destino: `-a` executa um comando nativo
 do agente e `-p` encaminha a flag e os argumentos seguintes ao PowerTools. Por
 exemplo, `vr_agent -a -info` exibe nome, versão e plataforma detectada, enquanto
 `vr_agent -p -info` encaminha `-info` ao PowerTools. As plataformas suportadas
-são Windows e Linux. O PowerTools é localizado junto ao executável do VR Agent
-(`PowerTools.exe` no Windows e `PowerTools` no Linux); sua saída e seu código de
-retorno são repassados pelo agente. `-a -update -crontab` sincroniza as tarefas
+são Windows e Linux. O PowerTools é sempre localizado em
+`C:\vr\agent\PowerTools.exe` no Windows ou `/vr/agent/PowerTools` no Linux; sua
+saída e seu código de retorno são repassados pelo agente. `-a -update -crontab` sincroniza as tarefas
 do servidor configurado em `.env` para o arquivo criptografado `.crontab`;
 `-a -crontab` lista as tarefas locais. No modo contínuo (sem argumentos), o agente executa as
 tarefas habilitadas no `.crontab` conforme expressões cron de cinco campos e

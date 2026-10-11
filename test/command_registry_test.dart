@@ -95,6 +95,24 @@ void main() {
   });
 
   group('PowerToolsRepositoryImpl', () {
+    test('uses the fixed Windows installation directory', () {
+      expect(
+        PowerToolsRepositoryImpl.defaultExecutablePath(
+          PlatformInfo.fromOperatingSystem('windows'),
+        ),
+        r'C:\vr\agent\PowerTools.exe',
+      );
+    });
+
+    test('uses the fixed Linux installation directory', () {
+      expect(
+        PowerToolsRepositoryImpl.defaultExecutablePath(
+          PlatformInfo.fromOperatingSystem('linux'),
+        ),
+        '/vr/agent/PowerTools',
+      );
+    });
+
     test(
       'forwards arguments and returns the process exit code',
       () async {
@@ -161,12 +179,13 @@ exit 7
           await executable.writeAsString('#!/bin/sh\nsleep 5\n');
           await Process.run('chmod', ['+x', executable.path]);
 
-          final result = await PowerToolsRepositoryImpl(
-            executablePath: executable.path,
-          ).execute(
-            ['-slow'],
-            timeout: const Duration(milliseconds: 100),
-          );
+          final result =
+              await PowerToolsRepositoryImpl(
+                executablePath: executable.path,
+              ).execute(
+                ['-slow'],
+                timeout: const Duration(milliseconds: 100),
+              );
 
           expect(result.timedOut, isTrue);
         } finally {

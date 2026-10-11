@@ -2,11 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:vr_agent/src/core/tools/platform_info.dart';
 import 'package:vr_agent/src/terminal/domain/entities/power_tools_result.dart';
 import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository.dart';
 
 class PowerToolsRepositoryImpl implements PowerToolsRepository {
   final String executablePath;
+
+  static String defaultExecutablePath(PlatformInfo platform) {
+    final directory = platform.isWindows ? r'C:\vr\agent' : '/vr/agent';
+    return '$directory${platform.pathSeparator}PowerTools'
+        '${platform.isWindows ? '.exe' : ''}';
+  }
 
   const PowerToolsRepositoryImpl({required this.executablePath});
 

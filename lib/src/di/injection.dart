@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:vr_agent/core/constants/app_constants.dart';
 import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
 import 'package:vr_agent/src/connection/data/repositories/connection_repository_impl.dart';
@@ -39,7 +37,6 @@ class AppDependencies {
 
 AppDependencies createAppDependencies({
   PlatformInfo? platformInfo,
-  String? powerToolsExecutablePath,
   PostgreSQLConnectionDatasource? connectionDatasource,
   FilePathDatasource? filePathDatasource,
   PowerToolsRepository? powerToolsRepository,
@@ -55,14 +52,12 @@ AppDependencies createAppDependencies({
     dataSource: postgresDatasource,
     healthCheckInterval: healthCheckInterval,
   );
-  final script = Platform.script;
-  final agentDirectory = script.scheme == 'file' && script.path.toLowerCase().endsWith('.dart') ? File.fromUri(script).parent.path : File(Platform.resolvedExecutable).parent.path;
-  final executablePath =
-      powerToolsExecutablePath ??
-      '$agentDirectory'
-          '${platform.pathSeparator}PowerTools'
-          '${platform.isWindows ? '.exe' : ''}';
-  final toolsRepository = powerToolsRepository ?? PowerToolsRepositoryImpl(executablePath: executablePath);
+  final executablePath = PowerToolsRepositoryImpl.defaultExecutablePath(
+    platform,
+  );
+  final toolsRepository =
+      powerToolsRepository ??
+      PowerToolsRepositoryImpl(executablePath: executablePath);
   final startAgent = StartAgent(connectionRepository);
   final closeAgent = CloseAgent(connectionRepository);
   final getAgentInfo = GetAgentInfo(
