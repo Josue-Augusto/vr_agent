@@ -308,7 +308,10 @@ void main() {
     );
 
     await repository.markCompleted(releaseId: 5);
-    expect(connection.query, isNot(contains('current_version =')));
+    expect(
+      connection.query,
+      contains('current_version_id = new_version_id'),
+    );
     expect(connection.query, contains('RETURNING id'));
     expect(connection.parameters?[0], 'completed');
     expect(connection.parameters?[2], 5);

@@ -44,8 +44,9 @@ class PostgresPowerToolsUpdateRepository implements PowerToolsUpdateRepository {
     required int releaseId,
   }) async {
     final rows = await connectionRepository.execute(
-      'UPDATE agent_update SET status = \$1, completion = \$2, '
-      'error_message = NULL WHERE id = \$3 RETURNING id',
+      'UPDATE agent_update SET current_version_id = new_version_id, '
+      'status = \$1, completion = \$2, error_message = NULL '
+      'WHERE id = \$3 RETURNING id',
       parameters: [
         'completed',
         DateTime.now().toUtc().toIso8601String(),
