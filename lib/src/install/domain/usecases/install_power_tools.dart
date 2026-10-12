@@ -57,10 +57,7 @@ class InstallPowerTools {
           executablePath: executablePath,
           platform: platform,
         );
-        await updateRepository.markCompleted(
-          releaseId: release.id,
-          installedVersion: version,
-        );
+        await updateRepository.markCompleted(releaseId: release.id);
       } catch (error, stackTrace) {
         try {
           await updateRepository.markFailed(

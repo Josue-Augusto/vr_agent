@@ -2,8 +2,7 @@ import 'package:vr_agent/src/connection/domain/repositories/connection_repositor
 import 'package:vr_agent/src/update/domain/entities/power_tools_release.dart';
 import 'package:vr_agent/src/update/domain/repositories/power_tools_update_repository.dart';
 
-class PostgresPowerToolsUpdateRepository
-    implements PowerToolsUpdateRepository {
+class PostgresPowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   final ConnectionRepository connectionRepository;
 
   const PostgresPowerToolsUpdateRepository({
@@ -13,17 +12,21 @@ class PostgresPowerToolsUpdateRepository
   @override
   Future<PowerToolsRelease?> getLatestRelease({required int serverId}) async {
     final rows = await connectionRepository.execute(
-      'SELECT id, current_version, new_version, repository FROM agent_update '
-      'WHERE server_id = \$1 ORDER BY version_date DESC, id DESC LIMIT 1',
+      'SELECT au.id, current_version.current_version, '
+      'new_version.new_version, new_version.repository '
+      'FROM agent_update AS au '
+      'LEFT JOIN agent_version AS current_version '
+      'ON current_version.id = au.current_version_id '
+      'LEFT JOIN agent_version AS new_version '
+      'ON new_version.id = au.new_version_id '
+      'WHERE au.server_id = \$1 '
+      'ORDER BY au.version_date DESC, au.id DESC LIMIT 1',
       parameters: [serverId],
     );
     if (rows.isEmpty) return null;
 
     final row = rows.first;
-    if (row['id'] is! num ||
-        row['current_version'] is! String ||
-        row['new_version'] is! String ||
-        row['repository'] is! String) {
+    if (row['id'] is! num || row['current_version'] is! String || row['new_version'] is! String || row['repository'] is! String) {
       throw const FormatException(
         'O registro de atualização do PowerTools possui dados inválidos.',
       );
@@ -39,13 +42,11 @@ class PostgresPowerToolsUpdateRepository
   @override
   Future<void> markCompleted({
     required int releaseId,
-    required String installedVersion,
   }) async {
     final rows = await connectionRepository.execute(
-      'UPDATE agent_update SET current_version = \$1, status = \$2, '
-      'completion = \$3, error_message = NULL WHERE id = \$4 RETURNING id',
+      'UPDATE agent_update SET status = \$1, completion = \$2, '
+      'error_message = NULL WHERE id = \$3 RETURNING id',
       parameters: [
-        installedVersion,
         'completed',
         DateTime.now().toUtc().toIso8601String(),
         releaseId,

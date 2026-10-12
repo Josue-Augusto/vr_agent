@@ -208,7 +208,6 @@ void main() {
       expect(powerTools.arguments, ['-version']);
       expect(updateRepository.requestedServerId, 42);
       expect(updateRepository.completedReleaseId, 9);
-      expect(updateRepository.installedVersion, '2.0.0');
       expect(installer.repositoryUrl, contains('drive.google.com'));
       expect(installer.executablePath, r'C:\vr\agent\PowerTools.exe');
       expect(connection.initialized, isTrue);
@@ -285,7 +284,17 @@ void main() {
     ).getLatestRelease(serverId: 42);
 
     expect(release?.id, 5);
-    expect(connection.query, contains('ORDER BY version_date DESC, id DESC'));
+    expect(release?.currentVersion, '1.0.0');
+    expect(release?.newVersion, '1.1.0');
+    expect(
+      connection.query,
+      contains('current_version.id = au.current_version_id'),
+    );
+    expect(
+      connection.query,
+      contains('new_version.id = au.new_version_id'),
+    );
+    expect(connection.query, contains('ORDER BY au.version_date DESC, au.id DESC'));
     expect(connection.parameters, [42]);
   });
 
@@ -298,11 +307,11 @@ void main() {
       connectionRepository: connection,
     );
 
-    await repository.markCompleted(releaseId: 5, installedVersion: '2.0.0');
-    expect(connection.query, contains('current_version = \$1'));
+    await repository.markCompleted(releaseId: 5);
+    expect(connection.query, isNot(contains('current_version =')));
     expect(connection.query, contains('RETURNING id'));
-    expect(connection.parameters?[0], '2.0.0');
-    expect(connection.parameters?[1], 'completed');
+    expect(connection.parameters?[0], 'completed');
+    expect(connection.parameters?[2], 5);
 
     await repository.markFailed(releaseId: 5, errorMessage: 'download failed');
     expect(connection.query, contains('status = \$1'));
@@ -406,7 +415,6 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   PowerToolsRelease? release;
   int? requestedServerId;
   int? completedReleaseId;
-  String? installedVersion;
   int? failedReleaseId;
   String? errorMessage;
 
@@ -419,10 +427,8 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   @override
   Future<void> markCompleted({
     required int releaseId,
-    required String installedVersion,
   }) async {
     completedReleaseId = releaseId;
-    this.installedVersion = installedVersion;
   }
 
   @override

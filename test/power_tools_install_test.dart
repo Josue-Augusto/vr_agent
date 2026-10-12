@@ -54,7 +54,6 @@ void main() {
       expect(updates.requestedServerId, 42);
       expect(installer.downloadedUrl, contains('drive.google.com'));
       expect(updates.completedReleaseId, 7);
-      expect(updates.installedVersion, '2.1.0');
     });
 
     test('marks a failed installation in the database', () async {
@@ -165,7 +164,6 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   PowerToolsRelease? release;
   int? requestedServerId;
   int? completedReleaseId;
-  String? installedVersion;
   int? failedReleaseId;
   String? failure;
 
@@ -178,10 +176,8 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   @override
   Future<void> markCompleted({
     required int releaseId,
-    required String installedVersion,
   }) async {
     completedReleaseId = releaseId;
-    this.installedVersion = installedVersion;
   }
 
   @override
