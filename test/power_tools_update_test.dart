@@ -394,6 +394,9 @@ class _FakeFilePathRepository implements FilePathRepository {
     required String fileName,
     required Map<String, dynamic> data,
   }) => throw UnimplementedError();
+
+  @override
+  Stream<void> watchFile({required String fileName}) => const Stream<void>.empty();
 }
 
 class _FakePowerToolsRepository implements PowerToolsRepository {

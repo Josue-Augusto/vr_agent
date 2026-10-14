@@ -20,8 +20,7 @@ class FilePathRepositoryImpl implements FilePathRepository {
        ),
        _directoryPath = directoryPath ?? directoryPathFor(platformInfo ?? PlatformInfo.current);
 
-  static String directoryPathFor(PlatformInfo platformInfo) =>
-      platformInfo.isWindows ? r'C:\vr\agent' : '/vr/agent';
+  static String directoryPathFor(PlatformInfo platformInfo) => platformInfo.isWindows ? r'C:\vr\agent' : '/vr/agent';
 
   String get directoryPath => _directoryPath;
 
@@ -58,6 +57,9 @@ class FilePathRepositoryImpl implements FilePathRepository {
     final encryptedContent = await jsonEncode(data).encryptIsolate();
     await datasource.writeFile(path: path, content: encryptedContent);
   }
+
+  @override
+  Stream<void> watchFile({required String fileName}) => datasource.watchFile(path: _pathFor(fileName));
 
   String _pathFor(String fileName) {
     if (fileName.isEmpty || fileName == '.' || fileName == '..' || _pathContext.basename(fileName) != fileName) {

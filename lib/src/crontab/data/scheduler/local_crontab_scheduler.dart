@@ -19,6 +19,9 @@ class LocalCrontabScheduler {
   List<AgentTask> _tasks = [];
   String? _lastCheckedMinute;
   Timer? _timer;
+  Timer? _reloadDebounceTimer;
+  StreamSubscription<void>? _crontabWatchSubscription;
+  bool _started = false;
 
   LocalCrontabScheduler({
     required this.filePathRepository,
@@ -31,19 +34,24 @@ class LocalCrontabScheduler {
   Future<void> start() async {
     if (_timer != null) return;
     _tasks = await _loadTasks();
-    for (final task in _tasks.where((task) => task.enabled)) {
-      CronExpression(task.schedule);
-      timezone.getLocation(task.timezone);
-    }
     _lastCheckedMinute = _minuteKey(DateTime.now().toUtc());
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      unawaited(_checkDueTasks());
-    });
+    _started = true;
+    _watchCrontab();
+    _scheduleNextCheck();
+  }
+
+  Future<void> reloadTasks() async {
+    _tasks = await _loadTasks();
   }
 
   Future<void> close() async {
+    _started = false;
     _timer?.cancel();
     _timer = null;
+    _reloadDebounceTimer?.cancel();
+    _reloadDebounceTimer = null;
+    await _crontabWatchSubscription?.cancel();
+    _crontabWatchSubscription = null;
     await Future.wait(_runningTasks.toList(growable: false));
   }
 
@@ -53,7 +61,7 @@ class LocalCrontabScheduler {
     if (tasks is! List) {
       throw const FormatException('O arquivo .crontab deve conter uma lista "tasks".');
     }
-    return tasks
+    final loadedTasks = tasks
         .map((task) {
           if (task is! Map<String, dynamic>) {
             throw const FormatException('Cada tarefa do .crontab deve ser um objeto JSON.');
@@ -61,17 +69,22 @@ class LocalCrontabScheduler {
           return AgentTask.fromJson(task);
         })
         .toList(growable: false);
+    for (final task in loadedTasks.where((task) => task.enabled)) {
+      CronExpression(task.schedule);
+      timezone.getLocation(task.timezone);
+    }
+    return loadedTasks;
   }
 
   Future<void> _checkDueTasks() async {
     try {
+      await reloadTasks();
+      if (!_started) return;
       final now = DateTime.now().toUtc();
       final minuteKey = _minuteKey(now);
       if (minuteKey == _lastCheckedMinute) return;
       _lastCheckedMinute = minuteKey;
-      _tasks = await _loadTasks();
-      if (_timer == null) return;
-      if (_runsThisMinute.length > 10000) _runsThisMinute.clear();
+      _runsThisMinute.clear();
       for (final task in _tasks) {
         if (!task.enabled || _runningTaskIds.contains(task.id)) continue;
         final key = '${task.id}:$minuteKey';
@@ -92,6 +105,62 @@ class LocalCrontabScheduler {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  void _scheduleNextCheck() {
+    if (!_started) return;
+    final now = DateTime.now().toUtc();
+    final nextMinute = DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    ).add(const Duration(minutes: 1));
+    final delay = nextMinute.difference(now);
+    _timer = Timer(delay, () {
+      _timer = null;
+      unawaited(_checkAndScheduleNext());
+    });
+  }
+
+  void _watchCrontab() {
+    _crontabWatchSubscription = filePathRepository
+        .watchFile(fileName: '.crontab')
+        .listen(
+          (_) {
+            _reloadDebounceTimer?.cancel();
+            _reloadDebounceTimer = Timer(
+              const Duration(milliseconds: 100),
+              () => unawaited(_reloadTasksFromWatch()),
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            developer.log(
+              'Falha ao observar alterações no .crontab; a verificação por minuto continuará ativa.',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          },
+        );
+  }
+
+  Future<void> _reloadTasksFromWatch() async {
+    if (!_started) return;
+    try {
+      await reloadTasks();
+    } catch (error, stackTrace) {
+      developer.log(
+        'Falha ao recarregar tarefas após alteração no .crontab.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _checkAndScheduleNext() async {
+    await _checkDueTasks();
+    if (_started && _timer == null) _scheduleNextCheck();
   }
 
   String _minuteKey(DateTime dateTime) => '${dateTime.year}-${dateTime.month}-${dateTime.day}-${dateTime.hour}-${dateTime.minute}';

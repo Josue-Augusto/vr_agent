@@ -3,6 +3,7 @@ import 'dart:io';
 abstract interface class FilePathDatasource {
   Future<String> readFile({required String path});
   Future<void> writeFile({required String path, required String content});
+  Stream<void> watchFile({required String path});
 }
 
 class LocalFilePathDatasource implements FilePathDatasource {
@@ -19,4 +20,8 @@ class LocalFilePathDatasource implements FilePathDatasource {
     await file.create(recursive: true);
     await file.writeAsString(content);
   }
+
+  @override
+  Stream<void> watchFile({required String path}) =>
+      File(path).watch().map((_) {});
 }

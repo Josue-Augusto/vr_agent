@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:test/test.dart';
 import 'package:vr_agent/src/connection/domain/entitie/connection_config.dart';
 import 'package:vr_agent/src/connection/domain/repositories/connection_repository.dart';
 import 'package:vr_agent/src/crontab/data/repositories/agent_task_command_runner.dart';
 import 'package:vr_agent/src/crontab/data/scheduler/cron_expression.dart';
+import 'package:vr_agent/src/crontab/data/scheduler/local_crontab_scheduler.dart';
 import 'package:vr_agent/src/crontab/domain/entities/agent_task.dart';
 import 'package:vr_agent/src/crontab/domain/entities/task_run_result.dart';
 import 'package:vr_agent/src/crontab/domain/repositories/crontab_repository.dart';
@@ -88,6 +91,32 @@ void main() {
     expect(filePath.writtenJson!['tasks'], hasLength(1));
     expect(connection.initialized, isTrue);
     expect(connection.closed, isTrue);
+  });
+
+  test('reloads tasks when the crontab file changes', () async {
+    final filePath = _FakeFilePathRepository()
+      ..jsonToRead = {'tasks': <Object>[]};
+    final reloaded = Completer<void>();
+    filePath.onRead = (readCount) {
+      if (readCount == 2) reloaded.complete();
+    };
+    final database = _FakeCrontabRepository();
+    final scheduler = LocalCrontabScheduler(
+      filePathRepository: filePath,
+      crontabRepository: database,
+      runCrontabTask: RunCrontabTask(
+        crontabRepository: database,
+        taskCommandRunner: _RetryingTaskCommandRunner(),
+      ),
+    );
+
+    await scheduler.start();
+    filePath.watchController.add(null);
+    await reloaded.future.timeout(const Duration(seconds: 2));
+    await scheduler.close();
+    await filePath.watchController.close();
+
+    expect(filePath.readCount, 2);
   });
 
   test('routes -update -crontab to task synchronization', () async {
@@ -215,9 +244,15 @@ class _FakeFilePathRepository implements FilePathRepository {
   String? readFileName;
   String? writeFileName;
   Map<String, dynamic>? writtenJson;
+  int readCount = 0;
+  void Function(int readCount)? onRead;
+  final StreamController<void> watchController =
+      StreamController<void>.broadcast();
 
   @override
   Future<Map<String, dynamic>> readJson({required String fileName}) async {
+    readCount++;
+    onRead?.call(readCount);
     readFileName = fileName;
     return jsonToRead;
   }
@@ -230,6 +265,9 @@ class _FakeFilePathRepository implements FilePathRepository {
     writeFileName = fileName;
     writtenJson = data;
   }
+
+  @override
+  Stream<void> watchFile({required String fileName}) => watchController.stream;
 }
 
 class _FakeCrontabRepository implements CrontabRepository {
