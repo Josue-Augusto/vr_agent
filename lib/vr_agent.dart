@@ -20,7 +20,10 @@ class VRAgent {
   }
 
   Future<void> close() async {
-    await closeScheduler?.call();
-    await closeAgent();
+    try {
+      await closeScheduler?.call();
+    } finally {
+      await closeAgent();
+    }
   }
 }

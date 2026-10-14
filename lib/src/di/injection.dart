@@ -79,8 +79,7 @@ AppDependencies createAppDependencies({
     updateRepository: PostgresPowerToolsUpdateRepository(
       connectionRepository: connectionRepository,
     ),
-    binaryInstaller:
-        powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
+    binaryInstaller: powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
     executablePath: executablePath,
     platform: platform,
   );
@@ -98,6 +97,7 @@ AppDependencies createAppDependencies({
   final taskCommandRunner = AgentTaskCommandRunner(
     powerToolsRepository: toolsRepository,
     getAgentInfo: getAgentInfo,
+    platformInfo: platform,
   );
   final runCrontabTask = RunCrontabTask(
     crontabRepository: crontabRepository,

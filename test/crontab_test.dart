@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:test/test.dart';
 import 'package:vr_agent/src/connection/domain/entitie/connection_config.dart';
 import 'package:vr_agent/src/connection/domain/repositories/connection_repository.dart';
+import 'package:vr_agent/src/core/tools/platform_info.dart';
 import 'package:vr_agent/src/crontab/data/repositories/agent_task_command_runner.dart';
+import 'package:vr_agent/src/crontab/data/repositories/postgres_crontab_repository.dart';
 import 'package:vr_agent/src/crontab/data/scheduler/cron_expression.dart';
 import 'package:vr_agent/src/crontab/data/scheduler/local_crontab_scheduler.dart';
 import 'package:vr_agent/src/crontab/domain/entities/agent_task.dart';
@@ -94,8 +96,7 @@ void main() {
   });
 
   test('reloads tasks when the crontab file changes', () async {
-    final filePath = _FakeFilePathRepository()
-      ..jsonToRead = {'tasks': <Object>[]};
+    final filePath = _FakeFilePathRepository()..jsonToRead = {'tasks': <Object>[]};
     final reloaded = Completer<void>();
     filePath.onRead = (readCount) {
       if (readCount == 2) reloaded.complete();
@@ -160,6 +161,88 @@ void main() {
     expect(result.succeeded, isTrue);
   });
 
+  test('runs Linux scheduled tasks as their configured user', () async {
+    final invoker = _FakeScheduledCliInvoker();
+    final runner = AgentTaskCommandRunner(
+      powerToolsRepository: _FakePowerToolsRepository(),
+      getAgentInfo: GetAgentInfo(
+        name: 'VR Agent',
+        version: '1.0.0',
+        platform: 'Linux',
+      ),
+      platformInfo: PlatformInfo.fromOperatingSystem('linux'),
+      cliInvoker: invoker,
+    );
+
+    final result = await runner.run(
+      _task(command: '-p -backup --full', runAsUser: 'backupuser'),
+    );
+
+    expect(invoker.arguments, ['-p', '-backup', '--full']);
+    expect(invoker.runAsUser, 'backupuser');
+    expect(result.succeeded, isTrue);
+  });
+
+  test('uses the configured Windows service identity for scheduled tasks', () async {
+    final powerTools = _FakePowerToolsRepository();
+    final invoker = _FakeScheduledCliInvoker();
+    final runner = AgentTaskCommandRunner(
+      powerToolsRepository: powerTools,
+      getAgentInfo: GetAgentInfo(
+        name: 'VR Agent',
+        version: '1.0.0',
+        platform: 'Windows',
+      ),
+      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+      cliInvoker: invoker,
+    );
+
+    await runner.run(_task(command: '-p -backup', runAsUser: 'ignored-user'));
+
+    expect(powerTools.arguments, ['-backup']);
+    expect(invoker.arguments, isNull);
+  });
+
+  test('routes scheduled native updates through the CLI on Linux', () async {
+    final invoker = _FakeScheduledCliInvoker();
+    final runner = AgentTaskCommandRunner(
+      powerToolsRepository: _FakePowerToolsRepository(),
+      getAgentInfo: GetAgentInfo(
+        name: 'VR Agent',
+        version: '1.0.0',
+        platform: 'Linux',
+      ),
+      platformInfo: PlatformInfo.fromOperatingSystem('linux'),
+      cliInvoker: invoker,
+    );
+
+    await runner.run(_task(command: '-a -update -crontab'));
+
+    expect(invoker.arguments, ['-a', '-update', '-crontab']);
+    expect(invoker.runAsUser, isNull);
+  });
+
+  test('does not use the Linux run-as user for Windows CLI tasks', () async {
+    final invoker = _FakeScheduledCliInvoker();
+    final runner = AgentTaskCommandRunner(
+      powerToolsRepository: _FakePowerToolsRepository(),
+      getAgentInfo: GetAgentInfo(
+        name: 'VR Agent',
+        version: '1.0.0',
+        platform: 'Windows',
+      ),
+      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+      cliInvoker: invoker,
+    );
+
+    await runner.run(
+      _task(command: '-a -update', runAsUser: 'root'),
+    );
+
+    expect(invoker.arguments, ['-a', '-update']);
+    expect(invoker.runAsUser, isNull);
+  });
+
   test('stores PowerTools output and exit code in the scheduled task run', () async {
     final database = _FakeCrontabRepository();
     final powerTools = _FakePowerToolsRepository()
@@ -188,6 +271,31 @@ void main() {
     expect(database.finishedRuns.single['exitCode'], 0);
     expect(database.finishedRuns.single['stdout'], 'Backup simulado.');
     expect(database.finishedRuns.single['stderr'], 'Aviso simulado.');
+  });
+
+  test('uses a consistent varchar type for task status in PostgreSQL', () async {
+    final connection = _FakeConnectionRepository();
+    final repository = PostgresCrontabRepository(
+      connectionRepository: connection,
+    );
+
+    await repository.finishTaskRun(
+      runId: 9,
+      task: _task(),
+      startedAt: DateTime.utc(2026, 10, 14),
+      status: 'success',
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      errorMessage: null,
+    );
+
+    expect(connection.queries, hasLength(2));
+    expect(
+      connection.queries.last,
+      contains(r"$2::varchar = 'success'::varchar"),
+    );
+    expect(connection.queryParameters.last![1], 'success');
   });
 
   test('agent task prefix runs native agent version action', () async {
@@ -223,6 +331,7 @@ AgentTask _task({
   String command = '-a -version',
   int maxRetries = 0,
   int retryDelaySeconds = 60,
+  String? runAsUser,
 }) => AgentTask(
   id: 3,
   serverId: 42,
@@ -235,7 +344,7 @@ AgentTask _task({
   timeoutSeconds: 300,
   maxRetries: maxRetries,
   retryDelaySeconds: retryDelaySeconds,
-  runAsUser: null,
+  runAsUser: runAsUser,
   priority: 5,
 );
 
@@ -246,8 +355,7 @@ class _FakeFilePathRepository implements FilePathRepository {
   Map<String, dynamic>? writtenJson;
   int readCount = 0;
   void Function(int readCount)? onRead;
-  final StreamController<void> watchController =
-      StreamController<void>.broadcast();
+  final StreamController<void> watchController = StreamController<void>.broadcast();
 
   @override
   Future<Map<String, dynamic>> readJson({required String fileName}) async {
@@ -320,6 +428,8 @@ class _FakeCrontabRepository implements CrontabRepository {
 class _FakeConnectionRepository implements ConnectionRepository {
   bool initialized = false;
   bool closed = false;
+  final List<String> queries = [];
+  final List<List<Object?>?> queryParameters = [];
 
   @override
   Future<void> init({String? user, String? password}) async {
@@ -335,7 +445,11 @@ class _FakeConnectionRepository implements ConnectionRepository {
   Future<List<Map<String, dynamic>>> execute(
     String query, {
     List<Object?>? parameters,
-  }) async => [];
+  }) async {
+    queries.add(query);
+    queryParameters.add(parameters);
+    return [];
+  }
 
   @override
   Future<ConnectionConfig> getConfig() => throw UnimplementedError();
@@ -380,6 +494,22 @@ class _RetryingTaskCommandRunner implements TaskCommandRunner {
         stderr: 'failed',
       );
     }
+    return const TaskRunResult(exitCode: 0, stdout: 'done', stderr: '');
+  }
+}
+
+class _FakeScheduledCliInvoker implements ScheduledCliInvoker {
+  List<String>? arguments;
+  String? runAsUser;
+
+  @override
+  Future<TaskRunResult> run(
+    List<String> arguments, {
+    String? runAsUser,
+    required Duration timeout,
+  }) async {
+    this.arguments = arguments;
+    this.runAsUser = runAsUser;
     return const TaskRunResult(exitCode: 0, stdout: 'done', stderr: '');
   }
 }

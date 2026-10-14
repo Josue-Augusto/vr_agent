@@ -206,6 +206,7 @@ class _FakePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller {
     required String repositoryUrl,
     required String executablePath,
     required PlatformInfo platform,
+    String? expectedVersion,
   }) async {
     downloadedUrl = repositoryUrl;
     final error = this.error;

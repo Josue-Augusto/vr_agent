@@ -63,7 +63,8 @@ class PostgresCrontabRepository implements CrontabRepository {
     );
     await connectionRepository.execute(
       'UPDATE agent_tasks SET last_run_at = \$1, last_status = \$2, last_exit_code = \$3, '
-      'last_error = \$4, consecutive_failures = CASE WHEN \$2 = \'success\' '
+      'last_error = \$4, consecutive_failures = CASE '
+      'WHEN \$2::varchar = \'success\'::varchar '
       'THEN 0 ELSE consecutive_failures + 1 END, updated_at = \$1 WHERE id = \$5',
       parameters: [
         finishedAt,

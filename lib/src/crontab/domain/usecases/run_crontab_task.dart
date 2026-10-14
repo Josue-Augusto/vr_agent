@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' as io;
 
 import 'package:vr_agent/src/crontab/domain/entities/agent_task.dart';
 import 'package:vr_agent/src/crontab/domain/entities/task_run_result.dart';
@@ -17,6 +18,10 @@ class RunCrontabTask {
   Future<void> call(AgentTask task) async {
     for (var attempt = 1; attempt <= task.maxRetries + 1; attempt++) {
       final startedAt = DateTime.now().toUtc();
+      io.stdout.writeln(
+        '[${startedAt.toIso8601String()}] Starting scheduled task '
+        '${task.id} (${task.name}), attempt $attempt.',
+      );
       final runId = await crontabRepository.startTaskRun(
         task: task,
         attempt: attempt,
@@ -24,16 +29,18 @@ class RunCrontabTask {
       );
       late final TaskRunResult result;
       try {
-        result = await taskCommandRunner.run(task).timeout(
-          Duration(seconds: task.timeoutSeconds),
-          onTimeout: () => TaskRunResult(
-            exitCode: -1,
-            stdout: '',
-            stderr: '',
-            errorMessage: 'A tarefa excedeu o limite de tempo.',
-            timedOut: true,
-          ),
-        );
+        result = await taskCommandRunner
+            .run(task)
+            .timeout(
+              Duration(seconds: task.timeoutSeconds),
+              onTimeout: () => TaskRunResult(
+                exitCode: -1,
+                stdout: '',
+                stderr: '',
+                errorMessage: 'A tarefa excedeu o limite de tempo.',
+                timedOut: true,
+              ),
+            );
       } catch (error) {
         result = TaskRunResult(
           exitCode: -1,
@@ -48,10 +55,7 @@ class RunCrontabTask {
           : result.succeeded
           ? 'success'
           : 'failed';
-      final errorMessage = result.errorMessage ??
-          (status == 'failed'
-              ? 'O comando terminou com código ${result.exitCode}.'
-              : null);
+      final errorMessage = result.errorMessage ?? (status == 'failed' ? 'O comando terminou com código ${result.exitCode}.' : null);
       await crontabRepository.finishTaskRun(
         runId: runId,
         task: task,
@@ -62,6 +66,17 @@ class RunCrontabTask {
         stderr: result.stderr,
         errorMessage: errorMessage,
       );
+      final finishedAt = DateTime.now().toUtc().toIso8601String();
+      if (status == 'success') {
+        io.stdout.writeln(
+          '[$finishedAt] Scheduled task ${task.id} (${task.name}) completed successfully.',
+        );
+      } else {
+        io.stderr.writeln(
+          '[$finishedAt] Scheduled task ${task.id} (${task.name}) '
+          'ended with status "$status": $errorMessage',
+        );
+      }
       if (status == 'success' || attempt > task.maxRetries) return;
       await Future<void>.delayed(Duration(seconds: task.retryDelaySeconds));
     }

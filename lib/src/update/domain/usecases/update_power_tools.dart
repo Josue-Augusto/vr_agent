@@ -72,7 +72,29 @@ class UpdatePowerTools {
           repositoryUrl: release.repository,
           executablePath: executablePath,
           platform: platform,
+          expectedVersion: newVersion,
         );
+        final installedVersionResult = await powerToolsRepository.execute(
+          ['-version'],
+          timeout: const Duration(seconds: 30),
+        );
+        if (installedVersionResult.timedOut ||
+            installedVersionResult.exitCode != 0) {
+          throw StateError(
+            'Não foi possível validar a versão instalada do PowerTools. '
+            'Código ${installedVersionResult.exitCode}. '
+            '${installedVersionResult.stderr}',
+          );
+        }
+        final installedVersion = _versionFromOutput(
+          '${installedVersionResult.stdout}\n${installedVersionResult.stderr}',
+        );
+        if (_compareVersions(installedVersion, newVersion) < 0) {
+          throw StateError(
+            'O PowerTools instalado continua na versão $installedVersion; '
+            'era esperada a versão $newVersion ou superior.',
+          );
+        }
         await updateRepository.markCompleted(releaseId: release.id);
       } catch (error, stackTrace) {
         await _recordFailure(release.id, error, stackTrace);

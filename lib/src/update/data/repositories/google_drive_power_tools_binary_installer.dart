@@ -9,18 +9,23 @@ import 'package:vr_agent/src/update/domain/repositories/power_tools_binary_insta
 
 class GoogleDrivePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller {
   final Dio _dio;
+  final Future<String> Function(String executablePath) _versionReader;
 
-  GoogleDrivePowerToolsBinaryInstaller({Dio? dio}) : _dio = dio ?? Dio();
+  GoogleDrivePowerToolsBinaryInstaller({
+    Dio? dio,
+    Future<String> Function(String executablePath)? versionReader,
+  }) : _dio = dio ?? Dio(),
+       _versionReader = versionReader ?? _readBinaryVersion;
 
   @override
-  Future<bool> isInstalled({required String executablePath}) =>
-      File(executablePath).exists();
+  Future<bool> isInstalled({required String executablePath}) => File(executablePath).exists();
 
   @override
   Future<void> install({
     required String repositoryUrl,
     required String executablePath,
     required PlatformInfo platform,
+    String? expectedVersion,
   }) async {
     final downloadUrl = _downloadUrl(repositoryUrl);
     final target = File(executablePath);
@@ -86,6 +91,13 @@ class GoogleDrivePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller 
         }
       }
 
+      if (expectedVersion != null) {
+        await _validateDownloadedBinary(
+          temporary.path,
+          expectedVersion: expectedVersion,
+        );
+      }
+
       if (await target.exists()) {
         await target.rename(backup.path);
         targetMovedToBackup = true;
@@ -124,6 +136,58 @@ class GoogleDrivePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller 
     } finally {
       if (await temporary.exists()) await temporary.delete();
     }
+  }
+
+  Future<void> _validateDownloadedBinary(
+    String executablePath, {
+    required String expectedVersion,
+  }) async {
+    final output = await _versionReader(executablePath);
+    final matches = RegExp(
+      r'(?<![A-Za-z0-9.])v?(\d+(?:\.\d+)+)(?![A-Za-z0-9.])',
+    ).allMatches(output);
+    if (matches.isEmpty) {
+      throw FormatException(
+        'Não foi possível identificar a versão do PowerTools baixado: '
+        '${output.trim()}',
+      );
+    }
+    final downloadedVersion = matches.last.group(1)!;
+    if (_compareVersions(downloadedVersion, expectedVersion) < 0) {
+      throw StateError(
+        'O arquivo no link de download contém PowerTools $downloadedVersion, '
+        'mas o banco espera $expectedVersion. O executável instalado não foi alterado. '
+        'Atualize o link do arquivo da versão $expectedVersion.',
+      );
+    }
+  }
+
+  static Future<String> _readBinaryVersion(String executablePath) async {
+    final result = await Process.run(
+      executablePath,
+      ['-version'],
+      workingDirectory: File(executablePath).parent.path,
+      runInShell: false,
+    ).timeout(const Duration(seconds: 30));
+    if (result.exitCode != 0) {
+      throw StateError(
+        'O PowerTools baixado não conseguiu informar sua versão. '
+        'Código ${result.exitCode}: ${result.stderr}',
+      );
+    }
+    return '${result.stdout}\n${result.stderr}';
+  }
+
+  int _compareVersions(String left, String right) {
+    final leftParts = left.split('.').map(int.parse).toList(growable: false);
+    final rightParts = right.split('.').map(int.parse).toList(growable: false);
+    final length = leftParts.length > rightParts.length ? leftParts.length : rightParts.length;
+    for (var index = 0; index < length; index++) {
+      final leftPart = index < leftParts.length ? leftParts[index] : 0;
+      final rightPart = index < rightParts.length ? rightParts[index] : 0;
+      if (leftPart != rightPart) return leftPart.compareTo(rightPart);
+    }
+    return 0;
   }
 
   Future<Response<dynamic>> _download(

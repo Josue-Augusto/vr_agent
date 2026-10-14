@@ -36,10 +36,12 @@ void main() {
       try {
         await GoogleDrivePowerToolsBinaryInstaller(
           dio: Dio()..httpClientAdapter = adapter,
+          versionReader: (_) async => 'PowerTools version 1.2.0',
         ).install(
           repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
           executablePath: target.path,
           platform: PlatformInfo.fromOperatingSystem('windows'),
+          expectedVersion: '1.2.0',
         );
 
         expect(await target.readAsBytes(), [1, 2, 3, 4]);
@@ -49,6 +51,40 @@ void main() {
         final remainingFiles = directory.listSync();
         expect(remainingFiles, hasLength(1));
         expect(remainingFiles.single.path, endsWith('PowerTools.exe'));
+      } finally {
+        await directory.delete(recursive: true);
+      }
+    });
+
+    test('rejects an outdated download without replacing the installed binary', () async {
+      final directory = await Directory.systemTemp.createTemp();
+      final adapter = _FakeHttpClientAdapter([
+        ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
+      ]);
+      final target = File('${directory.path}/PowerTools.exe');
+      await target.writeAsBytes([9, 9]);
+
+      try {
+        await expectLater(
+          GoogleDrivePowerToolsBinaryInstaller(
+            dio: Dio()..httpClientAdapter = adapter,
+            versionReader: (_) async => 'PowerTools version 1.0.19',
+          ).install(
+            repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
+            executablePath: target.path,
+            platform: PlatformInfo.fromOperatingSystem('windows'),
+            expectedVersion: '1.0.20',
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('contém PowerTools 1.0.19'),
+            ),
+          ),
+        );
+        expect(await target.readAsBytes(), [9, 9]);
+        expect(directory.listSync(), hasLength(1));
       } finally {
         await directory.delete(recursive: true);
       }
@@ -136,11 +172,18 @@ void main() {
       final connection = _FakeConnectionRepository();
       final filePath = _FakeFilePathRepository()..config = {'server_id': 42};
       final powerTools = _FakePowerToolsRepository()
-        ..result = const PowerToolsResult(
-          exitCode: 0,
-          stdout: 'PowerTools version 1.0.0',
-          stderr: '',
-        );
+        ..results.addAll([
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 1.0.0',
+            stderr: '',
+          ),
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 1.1.0',
+            stderr: '',
+          ),
+        ]);
       final installer = _FakePowerToolsBinaryInstaller();
       final update = _useCase(
         connectionRepository: connection,
@@ -180,11 +223,18 @@ void main() {
       final connection = _FakeConnectionRepository();
       final filePath = _FakeFilePathRepository()..config = {'server_id': 42};
       final powerTools = _FakePowerToolsRepository()
-        ..result = const PowerToolsResult(
-          exitCode: 0,
-          stdout: 'PowerTools version 1.9.0',
-          stderr: '',
-        );
+        ..results.addAll([
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 1.9.0',
+            stderr: '',
+          ),
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 2.0.0',
+            stderr: '',
+          ),
+        ]);
       final updateRepository = _FakePowerToolsUpdateRepository()
         ..release = const PowerToolsRelease(
           id: 9,
@@ -210,8 +260,50 @@ void main() {
       expect(updateRepository.completedReleaseId, 9);
       expect(installer.repositoryUrl, contains('drive.google.com'));
       expect(installer.executablePath, r'C:\vr\agent\PowerTools.exe');
+      expect(installer.expectedVersion, '2.0.0');
       expect(connection.initialized, isTrue);
       expect(connection.closed, isTrue);
+    });
+
+    test('does not mark update completed if downloaded binary is still old', () async {
+      final updateRepository = _FakePowerToolsUpdateRepository()
+        ..release = const PowerToolsRelease(
+          id: 12,
+          currentVersion: '1.0.0',
+          newVersion: '2.0.0',
+          repository: 'https://drive.google.com/file/d/example/view',
+        );
+      final powerTools = _FakePowerToolsRepository()
+        ..results.addAll([
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 1.0.0',
+            stderr: '',
+          ),
+          const PowerToolsResult(
+            exitCode: 0,
+            stdout: 'PowerTools version 1.0.0',
+            stderr: '',
+          ),
+        ]);
+
+      await expectLater(
+        _useCase(
+          powerToolsRepository: powerTools,
+          updateRepository: updateRepository,
+        )(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('continua na versão 1.0.0'),
+          ),
+        ),
+      );
+
+      expect(updateRepository.completedReleaseId, isNull);
+      expect(updateRepository.failedReleaseId, 12);
+      expect(updateRepository.errorMessage, contains('continua na versão 1.0.0'));
     });
 
     test('does not reinstall an equal semantic version', () async {
@@ -406,6 +498,7 @@ class _FakePowerToolsRepository implements PowerToolsRepository {
     stderr: '',
   );
   List<String>? arguments;
+  final List<PowerToolsResult> results = [];
 
   @override
   Future<PowerToolsResult> execute(
@@ -413,6 +506,7 @@ class _FakePowerToolsRepository implements PowerToolsRepository {
     Duration? timeout,
   }) async {
     this.arguments = arguments;
+    if (results.isNotEmpty) return results.removeAt(0);
     return result;
   }
 }
@@ -450,6 +544,7 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
 class _FakePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller {
   String? repositoryUrl;
   String? executablePath;
+  String? expectedVersion;
   Object? error;
   bool installed = false;
 
@@ -461,9 +556,11 @@ class _FakePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller {
     required String repositoryUrl,
     required String executablePath,
     required PlatformInfo platform,
+    String? expectedVersion,
   }) async {
     this.repositoryUrl = repositoryUrl;
     this.executablePath = executablePath;
+    this.expectedVersion = expectedVersion;
     final error = this.error;
     if (error != null) throw error;
   }

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
+import 'dart:io' as io;
 
 import 'package:timezone/data/latest.dart' as timezone_data;
 import 'package:timezone/timezone.dart' as timezone;
@@ -38,6 +38,10 @@ class LocalCrontabScheduler {
     _started = true;
     _watchCrontab();
     _scheduleNextCheck();
+    io.stdout.writeln(
+      'Crontab scheduler started with '
+      '${_tasks.where((task) => task.enabled).length} enabled task(s).',
+    );
   }
 
   Future<void> reloadTasks() async {
@@ -99,10 +103,8 @@ class LocalCrontabScheduler {
         unawaited(execution.whenComplete(() => _runningTasks.remove(execution)));
       }
     } catch (error, stackTrace) {
-      developer.log(
-        'Falha ao verificar tarefas do .crontab.',
-        error: error,
-        stackTrace: stackTrace,
+      io.stderr.writeln(
+        'Falha ao verificar tarefas do .crontab: $error\n$stackTrace',
       );
     }
   }
@@ -136,10 +138,9 @@ class LocalCrontabScheduler {
             );
           },
           onError: (Object error, StackTrace stackTrace) {
-            developer.log(
-              'Falha ao observar alterações no .crontab; a verificação por minuto continuará ativa.',
-              error: error,
-              stackTrace: stackTrace,
+            io.stderr.writeln(
+              'Falha ao observar alterações no .crontab; a verificação por minuto continuará ativa: '
+              '$error\n$stackTrace',
             );
           },
         );
@@ -150,10 +151,8 @@ class LocalCrontabScheduler {
     try {
       await reloadTasks();
     } catch (error, stackTrace) {
-      developer.log(
-        'Falha ao recarregar tarefas após alteração no .crontab.',
-        error: error,
-        stackTrace: stackTrace,
+      io.stderr.writeln(
+        'Falha ao recarregar tarefas após alteração no .crontab: $error\n$stackTrace',
       );
     }
   }
@@ -169,10 +168,8 @@ class LocalCrontabScheduler {
     try {
       await runCrontabTask(task);
     } catch (error, stackTrace) {
-      developer.log(
-        'Falha ao registrar a execução da tarefa ${task.id}.',
-        error: error,
-        stackTrace: stackTrace,
+      io.stderr.writeln(
+        'Falha ao registrar a execução da tarefa ${task.id}: $error\n$stackTrace',
       );
     } finally {
       _runningTaskIds.remove(task.id);
