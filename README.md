@@ -10,6 +10,8 @@ vr_agent -p -check
 vr_agent -p -update
 vr_agent -a -update -crontab
 vr_agent -a -crontab
+vr_agent -a -install -powertools
+vr_agent -a -install -service
 vr_agent -p -backup
 vr_agent -a -help
 vr_agent --service
@@ -69,17 +71,37 @@ Consulte os logs com `sudo journalctl -u vr-agent.service -f`. A unidade usa
 
 ### Windows 10/11 com NSSM
 
-Instale NSSM e execute o PowerShell como administrador. Copie o executável para
-`C:\vr\agent\vr_agent.exe` e invoque o instalador, ajustando o caminho do NSSM
-se necessário:
+No diretório raiz do projeto, compile o executável e execute-o em um terminal
+PowerShell como administrador:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\deploy\windows\install-service.ps1 -NssmPath C:\nssm\win64\nssm.exe
+New-Item -ItemType Directory -Path C:\vr\agent -Force
+dart compile exe bin\main.dart -o C:\vr\agent\vr_agent.exe
+C:\vr\agent\vr_agent.exe -a -install -service
 ```
 
-O script configura inicialização automática, reinício após falha, parada por
-Ctrl+C e rotação de logs em `C:\vr\agent\logs`. No Windows, `run_as_user` não
+O comando cria `C:\vr\agent\install-service.ps1`, instala NSSM pelo `winget`
+se ele ainda não estiver disponível, registra/inicia `VRAgent` e configura
+inicialização automática, reinício após falha, parada por Ctrl+C e rotação de
+logs em `C:\vr\agent\logs`. O script gerado também pode ser executado diretamente
+como administrador. Se não houver `winget`, instale NSSM manualmente e use
+`.\install-service.ps1 -NssmPath <caminho-do-nssm.exe>`.
+
+No Linux, compile o executável, copie-o para `/vr/agent/vr_agent` e instale/inicie
+com:
+
+```sh
+dart compile exe bin/main.dart -o /tmp/vr_agent
+sudo install -D -m 0755 /tmp/vr_agent /vr/agent/vr_agent
+sudo /vr/agent/vr_agent -a -install -service
+```
+
+O comando grava `/etc/systemd/system/vr-agent.service`, recarrega o systemd,
+habilita o serviço para iniciar com o sistema e inicia/reinicia o processo.
+Consulte os logs com
+`sudo journalctl -u vr-agent.service -f`. O processo do serviço executa
+`vr_agent --service`; esta forma continua sendo a usada pelo próprio NSSM e
+systemd para iniciar o agente. No Windows, `run_as_user` não
 altera a identidade de execução: configure a conta do serviço nas propriedades
 de Log on do Windows Services/NSSM. Recomenda-se deixar `run_as_user` vazio nas
 tarefas Windows. O serviço executa

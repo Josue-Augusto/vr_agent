@@ -10,6 +10,9 @@ import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/filePath/data/datasources/local_file_path_datasource.dart';
 import 'package:vr_agent/src/filePath/data/repositories/file_path_repository_impl.dart';
 import 'package:vr_agent/src/install/domain/usecases/install_power_tools.dart';
+import 'package:vr_agent/src/service/data/repositories/platform_system_service_installation_repository.dart';
+import 'package:vr_agent/src/service/domain/repositories/system_service_installation_repository.dart';
+import 'package:vr_agent/src/service/domain/usecases/install_system_service.dart';
 import 'package:vr_agent/src/terminal/data/repositories/power_tools_repository_impl.dart';
 import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/close_agent.dart';
@@ -46,6 +49,7 @@ AppDependencies createAppDependencies({
   FilePathDatasource? filePathDatasource,
   PowerToolsRepository? powerToolsRepository,
   PowerToolsBinaryInstaller? powerToolsBinaryInstaller,
+  SystemServiceInstallationRepository? systemServiceInstallationRepository,
   Duration healthCheckInterval = const Duration(seconds: 30),
 }) {
   final platform = platformInfo ?? PlatformInfo.current;
@@ -113,6 +117,9 @@ AppDependencies createAppDependencies({
     crontabRepository: crontabRepository,
     connectionRepository: connectionRepository,
   );
+  final installSystemService = InstallSystemService(
+    systemServiceInstallationRepository ?? PlatformSystemServiceInstallationRepository(platform: platform),
+  );
   final commandRegistry = createDefaultCommandPalette(
     getAgentInfo: getAgentInfo,
     runPowerToolsCommand: runPowerToolsCommand,
@@ -120,6 +127,7 @@ AppDependencies createAppDependencies({
     filePathRepository: fileRepository,
     updatePowerTools: updatePowerTools,
     installPowerTools: installPowerTools,
+    installSystemService: installSystemService,
   );
 
   return AppDependencies(

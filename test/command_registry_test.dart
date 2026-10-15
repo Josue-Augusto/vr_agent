@@ -14,6 +14,7 @@ import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/command_registry.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/power_tools_command.dart';
+import 'package:vr_agent/src/service/domain/repositories/system_service_installation_repository.dart';
 
 void main() {
   group('CommandRegistry', () {
@@ -235,6 +236,31 @@ exit 7
     expect(exitCode, 9);
     expect(repository.arguments, ['-backup', '--full']);
   });
+
+  test('dependency injection routes service installation through its repository', () async {
+    final serviceInstallation = _FakeSystemServiceInstallationRepository();
+    final dependencies = createAppDependencies(
+      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+      connectionDatasource: _UnusedConnectionDatasource(),
+      systemServiceInstallationRepository: serviceInstallation,
+    );
+
+    expect(await dependencies.commandRegistry.run(['-a', '-install', '-service']), 0);
+    expect(serviceInstallation.installed, isTrue);
+  });
+
+  test('rejects service installation without the install selector', () async {
+    final registry = CommandRegistry()
+      ..register(
+        AgentCommand(
+          name: '-help',
+          description: 'Help',
+          action: (_) async => 0,
+        ),
+      );
+
+    expect(await registry.run(['-a', '-service']), 64);
+  });
 }
 
 class _FakePowerToolsRepository implements PowerToolsRepository {
@@ -256,4 +282,13 @@ class _UnusedConnectionDatasource implements PostgreSQLConnectionDatasource {
 
   @override
   Future<ConnectionModel> getConfig() => throw UnimplementedError();
+}
+
+class _FakeSystemServiceInstallationRepository implements SystemServiceInstallationRepository {
+  var installed = false;
+
+  @override
+  Future<void> install() async {
+    installed = true;
+  }
 }

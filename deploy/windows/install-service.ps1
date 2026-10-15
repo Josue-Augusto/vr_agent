@@ -1,49 +1,84 @@
+#Requires -RunAsAdministrator
 param(
-    [string]$NssmPath = 'C:\nssm\win64\nssm.exe',
+    [string]$NssmPath = '',
     [string]$ServiceName = 'VRAgent',
-    [string]$InstallDirectory = 'C:\vr\agent',
-    [string]$ExecutablePath = 'C:\vr\agent\vr_agent.exe'
+    [string]$InstallDirectory = $PSScriptRoot,
+    [string]$ExecutablePath = (Join-Path $PSScriptRoot 'vr_agent.exe')
 )
 
 $ErrorActionPreference = 'Stop'
 
-$nssm = (Resolve-Path -LiteralPath $NssmPath).Path
-$executable = (Resolve-Path -LiteralPath $ExecutablePath).Path
-$installDirectory = (Resolve-Path -LiteralPath $InstallDirectory).Path
-$logDirectory = Join-Path $installDirectory 'logs'
-New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
+    throw "Agent executable not found: $ExecutablePath"
+}
 
-function Set-NssmSetting {
-    param([string[]]$Arguments)
+if (-not $NssmPath -or -not (Test-Path -LiteralPath $NssmPath -PathType Leaf)) {
+    $nssmCommand = Get-Command nssm.exe -ErrorAction SilentlyContinue
+    if ($null -ne $nssmCommand) {
+        $NssmPath = $nssmCommand.Source
+    } else {
+        $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if ($null -eq $winget) {
+            throw 'winget was not found. Install App Installer or provide -NssmPath.'
+        }
+        & $winget.Source install --id NSSM.NSSM -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) {
+            throw "winget failed to install NSSM (exit code $LASTEXITCODE)."
+        }
 
-    & $nssm set $ServiceName @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "NSSM failed to set '$($Arguments[0])' for service '$ServiceName' (exit code $LASTEXITCODE)."
+        $candidatePaths = @(
+            (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\nssm.exe'),
+            (Join-Path $env:ProgramFiles 'NSSM\win64\nssm.exe'),
+            'C:\nssm\win64\nssm.exe'
+        )
+        $nssmCommand = Get-Command nssm.exe -ErrorAction SilentlyContinue
+        if ($null -ne $nssmCommand) {
+            $NssmPath = $nssmCommand.Source
+        } else {
+            $NssmPath = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        }
     }
 }
 
-& $nssm install $ServiceName $executable
-if ($LASTEXITCODE -ne 0) {
-    throw "NSSM failed to install service '$ServiceName' (exit code $LASTEXITCODE)."
+$nssm = (Resolve-Path -LiteralPath $NssmPath).Path
+$installDirectory = (Resolve-Path -LiteralPath $InstallDirectory).Path
+$executable = (Resolve-Path -LiteralPath $ExecutablePath).Path
+$logDirectory = Join-Path $installDirectory 'logs'
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+
+function Invoke-Nssm {
+    param([string[]]$Arguments)
+
+    & $nssm @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "NSSM failed to run '$($Arguments[0])' for service '$ServiceName' (exit code $LASTEXITCODE)."
+    }
 }
 
-Set-NssmSetting -Arguments @('AppDirectory', $installDirectory)
-Set-NssmSetting -Arguments @('AppParameters', '--service')
-Set-NssmSetting -Arguments @('AppStdout', (Join-Path $logDirectory 'service-out.log'))
-Set-NssmSetting -Arguments @('AppStderr', (Join-Path $logDirectory 'service-error.log'))
-Set-NssmSetting -Arguments @('AppRotateFiles', '1')
-Set-NssmSetting -Arguments @('AppRotateOnline', '1')
-Set-NssmSetting -Arguments @('AppRotateBytes', '10485760')
-Set-NssmSetting -Arguments @('AppExit', 'Default', 'Restart')
-Set-NssmSetting -Arguments @('AppRestartDelay', '5000')
-Set-NssmSetting -Arguments @('AppStopMethodConsole', '300000')
-Set-NssmSetting -Arguments @('AppStopMethodWindow', '0')
-Set-NssmSetting -Arguments @('AppStopMethodThreads', '0')
-Set-NssmSetting -Arguments @('Start', 'SERVICE_AUTO_START')
-
-& $nssm start $ServiceName
-if ($LASTEXITCODE -ne 0) {
-    throw "NSSM failed to start service '$ServiceName' (exit code $LASTEXITCODE)."
+$service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+if ($null -eq $service) {
+    Invoke-Nssm -Arguments @('install', $ServiceName, $executable)
+} else {
+    if ($service.Status -eq 'Running') {
+        Invoke-Nssm -Arguments @('stop', $ServiceName)
+    }
+    Invoke-Nssm -Arguments @('set', $ServiceName, 'Application', $executable)
 }
+
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppDirectory', $installDirectory)
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppParameters', '--service')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStdout', (Join-Path $logDirectory 'service-out.log'))
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStderr', (Join-Path $logDirectory 'service-error.log'))
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateFiles', '1')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateOnline', '1')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateBytes', '10485760')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppExit', 'Default', 'Restart')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRestartDelay', '5000')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodConsole', '300000')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodWindow', '0')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodThreads', '0')
+Invoke-Nssm -Arguments @('set', $ServiceName, 'Start', 'SERVICE_AUTO_START')
+
+Invoke-Nssm -Arguments @('start', $ServiceName)
 
 Write-Host "Service '$ServiceName' installed and started. Logs: $logDirectory"

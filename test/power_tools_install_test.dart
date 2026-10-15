@@ -75,13 +75,17 @@ void main() {
       expect(updates.failure, contains('download failed'));
     });
 
-    test('routes the bare install command through the command registry', () async {
+    test('routes PowerTools installation through the explicit install selector', () async {
+      List<String>? receivedArguments;
       final registry = CommandRegistry()
         ..register(
           AgentCommand(
-            name: 'install',
+            name: '-install',
             description: 'Install PowerTools',
-            action: (_) async => 17,
+            action: (arguments) async {
+              receivedArguments = arguments;
+              return 17;
+            },
           ),
         )
         ..register(
@@ -92,7 +96,8 @@ void main() {
           ),
         );
 
-      expect(await registry.run(['-a', 'install']), 17);
+      expect(await registry.run(['-a', '-install', '-powertools']), 17);
+      expect(receivedArguments, ['-powertools']);
     });
   });
 }
