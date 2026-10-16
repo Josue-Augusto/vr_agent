@@ -22,9 +22,7 @@ if (-not $NssmPath -or -not (Test-Path -LiteralPath $NssmPath -PathType Leaf)) {
             throw 'winget was not found. Install App Installer or provide -NssmPath.'
         }
         & $winget.Source install --id NSSM.NSSM -e --accept-source-agreements --accept-package-agreements
-        if ($LASTEXITCODE -ne 0) {
-            throw "winget failed to install NSSM (exit code $LASTEXITCODE)."
-        }
+        $wingetExitCode = $LASTEXITCODE
 
         $candidatePaths = @(
             (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\nssm.exe'),
@@ -36,6 +34,9 @@ if (-not $NssmPath -or -not (Test-Path -LiteralPath $NssmPath -PathType Leaf)) {
             $NssmPath = $nssmCommand.Source
         } else {
             $NssmPath = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        }
+        if (-not $NssmPath -and $wingetExitCode -ne 0) {
+            throw "winget failed to install NSSM (exit code $wingetExitCode), and nssm.exe could not be located."
         }
     }
 }
@@ -59,7 +60,7 @@ $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($null -eq $service) {
     Invoke-Nssm -Arguments @('install', $ServiceName, $executable)
 } else {
-    if ($service.Status -eq 'Running') {
+    if ($service.Status -ne 'Stopped') {
         Invoke-Nssm -Arguments @('stop', $ServiceName)
     }
     Invoke-Nssm -Arguments @('set', $ServiceName, 'Application', $executable)
@@ -79,6 +80,41 @@ Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodWindow', '0')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodThreads', '0')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'Start', 'SERVICE_AUTO_START')
 
-Invoke-Nssm -Arguments @('start', $ServiceName)
+function Get-ServiceStartupDiagnostics {
+    $details = @()
+    $currentService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($null -eq $currentService) {
+        $details += "Service '$ServiceName' could not be found."
+    } else {
+        $details += "Current service status: $($currentService.Status)"
+    }
+
+    foreach ($logPath in @(
+        (Join-Path $logDirectory 'service-error.log'),
+        (Join-Path $logDirectory 'service-out.log')
+    )) {
+        if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+            $logContent = @(Get-Content -LiteralPath $logPath -Tail 50 -ErrorAction SilentlyContinue)
+            if ($logContent.Count -gt 0) {
+                $details += "Recent contents of ${logPath}:`n$($logContent -join "`n")"
+            }
+        }
+    }
+
+    return $details -join "`n"
+}
+
+try {
+    Invoke-Nssm -Arguments @('start', $ServiceName)
+} catch {
+    $diagnostics = Get-ServiceStartupDiagnostics
+    throw "$($_.Exception.Message)`n$diagnostics"
+}
+
+$service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+if ($null -eq $service -or $service.Status -ne 'Running') {
+    $diagnostics = Get-ServiceStartupDiagnostics
+    throw "Service '$ServiceName' did not reach the Running state.`n$diagnostics"
+}
 
 Write-Host "Service '$ServiceName' installed and started. Logs: $logDirectory"

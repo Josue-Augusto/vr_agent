@@ -30,6 +30,13 @@ void main() {
         expect(script, contains('Microsoft\\WinGet\\Links\\nssm.exe'));
         expect(script, contains("'AppParameters', '--service'"));
         expect(script, contains("'SERVICE_AUTO_START'"));
+        expect(script, contains("\$service.Status -ne 'Stopped'"));
+        expect(script, contains('Get-ServiceStartupDiagnostics'));
+        expect(script, contains("'service-error.log'"));
+        expect(script, contains("\$service.Status -ne 'Running'"));
+        expect(script, contains('\$wingetExitCode = \$LASTEXITCODE'));
+        expect(script, contains('if (-not \$NssmPath -and \$wingetExitCode -ne 0)'));
+        expect(script, contains('and nssm.exe could not be located.'));
       } finally {
         await directory.delete(recursive: true);
       }

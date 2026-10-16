@@ -21,12 +21,12 @@ void main() {
       await LocalFilePathDatasource().writeFile(
         path: configFile.path,
         content: await jsonEncode({
-          'host': 'localhost',
-          'port': 5432,
-          'database': 'agent',
-          'username': 'agent_user',
-          'password': 'secret',
-          'sslMode': true,
+          'remotehost': 'localhost',
+          'remoteport': 5432,
+          'remotedatabase': 'agent',
+          'remoteusername': 'agent_user',
+          'remotepassword': 'secret',
+          'remotesslMode': true,
         }).encryptIsolate(),
       );
 
@@ -131,6 +131,25 @@ void main() {
       expect(
         await File('${directory.path}/missing/nested/config.conf').exists(),
         isTrue,
+      );
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('treats an empty crontab file as an empty task schedule', () async {
+    final directory = await Directory.systemTemp.createTemp();
+
+    try {
+      final repository = FilePathRepositoryImpl(
+        datasource: LocalFilePathDatasource(),
+        directoryPath: directory.path,
+      );
+
+      expect(await repository.readJson(fileName: '.crontab'), {'tasks': <dynamic>[]});
+      await expectLater(
+        repository.readJson(fileName: '.env'),
+        throwsA(isA<FormatException>()),
       );
     } finally {
       await directory.delete(recursive: true);

@@ -29,11 +29,13 @@ class FilePathRepositoryImpl implements FilePathRepository {
     final path = _pathFor(fileName);
     final encryptedContent = (await datasource.readFile(path: path)).trim();
     if (encryptedContent.isEmpty) {
+      if (fileName == '.crontab') return {'tasks': <dynamic>[]};
       throw FormatException('O arquivo está vazio: $path');
     }
 
     final contents = await encryptedContent.decryptIsolate();
     if (contents.trim().isEmpty) {
+      if (fileName == '.crontab') return {'tasks': <dynamic>[]};
       throw FormatException(
         'O arquivo está vazio: $path',
       );

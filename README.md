@@ -88,6 +88,11 @@ inicialização automática, reinício após falha, parada por Ctrl+C e rotaçã
 logs em `C:\vr\agent\logs`. O script gerado também pode ser executado diretamente
 como administrador. Se não houver `winget`, instale NSSM manualmente e use
 `.\install-service.ps1 -NssmPath <caminho-do-nssm.exe>`.
+Uma agenda `.crontab` vazia é iniciada como uma lista sem tarefas.
+Se a inicialização falhar, o instalador informa o estado do serviço e as últimas
+linhas dos logs `service-error.log` e `service-out.log`. Para consultar o NSSM
+com o comando `nssm` após instalá-lo pelo `winget`, abra um novo PowerShell para
+carregar a alteração de `PATH`.
 
 No Linux, compile o executável, copie-o para `/vr/agent/vr_agent` e instale/inicie
 com:
