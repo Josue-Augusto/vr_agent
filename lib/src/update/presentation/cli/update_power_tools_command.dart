@@ -10,7 +10,7 @@ class UpdatePowerToolsCommand {
 
   Future<int> call(List<String> arguments) async {
     if (arguments.isNotEmpty) {
-      stderr.writeln('Uso: vr_agent -a -update');
+      stderr.writeln('Uso: vr_agent -a -update -powertools');
       return 64;
     }
 

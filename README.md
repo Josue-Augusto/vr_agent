@@ -8,6 +8,7 @@ vr_agent -a -version
 vr_agent -a -info
 vr_agent -p -check
 vr_agent -p -update
+vr_agent -a -update -powertools
 vr_agent -a -update -crontab
 vr_agent -a -crontab
 vr_agent -a -install -powertools
@@ -23,7 +24,8 @@ exemplo, `vr_agent -a -info` exibe nome, versão e plataforma detectada, enquant
 `vr_agent -p -info` encaminha `-info` ao PowerTools. As plataformas suportadas
 são Windows e Linux. O PowerTools é sempre localizado em
 `C:\vr\agent\PowerTools.exe` no Windows ou `/vr/agent/PowerTools` no Linux; sua
-saída e seu código de retorno são repassados pelo agente. `-a -update -crontab` sincroniza as tarefas
+saída e seu código de retorno são repassados pelo agente.
+`-a -update -powertools` atualiza o PowerTools; `-a -update -crontab` sincroniza as tarefas
 do servidor configurado em `.env` para o arquivo criptografado `.crontab`;
 `-a -crontab` lista as tarefas locais. No modo contínuo (sem argumentos), o agente executa as
 tarefas habilitadas no `.crontab` conforme expressões cron de cinco campos e

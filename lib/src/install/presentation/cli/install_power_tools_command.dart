@@ -19,7 +19,7 @@ class InstallPowerToolsCommand {
       switch (result.status) {
         case PowerToolsInstallStatus.alreadyInstalled:
           stdout.writeln(
-            'O PowerTools já está instalado. Use -a -update para atualizar.',
+            'O PowerTools já está instalado. Use -a -update -powertools para atualizar.',
           );
           return 0;
         case PowerToolsInstallStatus.installed:

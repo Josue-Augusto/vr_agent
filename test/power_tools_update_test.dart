@@ -168,7 +168,7 @@ void main() {
   });
 
   group('UpdatePowerTools', () {
-    test('routes -a -update to the updater', () async {
+    test('routes -a -update -powertools to the updater', () async {
       final connection = _FakeConnectionRepository();
       final filePath = _FakeFilePathRepository()..config = {'server_id': 42};
       final powerTools = _FakePowerToolsRepository()
@@ -214,9 +214,30 @@ void main() {
         updatePowerTools: update,
       );
 
-      expect(await registry.run(['-a', '-update']), 0);
+      expect(await registry.run(['-a', '-update', '-powertools']), 0);
       expect(installer.repositoryUrl, isNotNull);
       expect(powerTools.arguments, ['-version']);
+    });
+
+    test('requires an explicit update target', () async {
+      final filePath = _FakeFilePathRepository();
+      final connection = _FakeConnectionRepository();
+      final registry = createDefaultCommandPalette(
+        getAgentInfo: const GetAgentInfo(
+          name: 'VR Agent',
+          version: '1.0.0',
+          platform: 'Windows',
+        ),
+        runPowerToolsCommand: RunPowerToolsCommand(_FakePowerToolsRepository()),
+        syncCrontab: SyncCrontab(
+          filePathRepository: filePath,
+          crontabRepository: _FakeCrontabRepository(),
+          connectionRepository: connection,
+        ),
+        filePathRepository: filePath,
+      );
+
+      expect(await registry.run(['-a', '-update']), 64);
     });
 
     test('installs a newer release and marks it completed', () async {

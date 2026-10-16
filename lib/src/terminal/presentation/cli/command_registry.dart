@@ -137,21 +137,27 @@ CommandRegistry createDefaultCommandPalette({
   registry.register(
     AgentCommand(
       name: '-update',
-      description: 'Atualiza o PowerTools; use -a -update -crontab para sincronizar tarefas.',
+      description: 'Atualiza o PowerTools (-powertools) ou sincroniza tarefas (-crontab).',
       action: (arguments) async {
-        if (arguments.isEmpty) {
-          final command = updatePowerToolsCommand;
-          if (command == null) {
-            stderr.writeln('A atualização do PowerTools não está configurada.');
-            return 1;
-          }
-          return command.call(const []);
+        if (arguments.length != 1) {
+          stderr.writeln('Uso: vr_agent -a -update <-powertools|-crontab>');
+          return 64;
         }
-        if (arguments.length == 1 && arguments.first == '-crontab') {
-          return updateCrontab.call(arguments.skip(1).toList(growable: false));
+
+        switch (arguments.single) {
+          case '-powertools':
+            final command = updatePowerToolsCommand;
+            if (command == null) {
+              stderr.writeln('A atualização do PowerTools não está configurada.');
+              return 1;
+            }
+            return command.call(const []);
+          case '-crontab':
+            return updateCrontab.call(const []);
+          default:
+            stderr.writeln('Uso: vr_agent -a -update <-powertools|-crontab>');
+            return 64;
         }
-        stderr.writeln('Uso: vr_agent -a -update [-crontab]');
-        return 64;
       },
     ),
   );
