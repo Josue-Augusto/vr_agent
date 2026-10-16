@@ -3,7 +3,7 @@ name: project-tree
 description: Generates a complete directory tree of the workspace, respecting ignore patterns. Useful for AI context and project onboarding.
 risk: low
 source: local
-date_added: '2026-10-14'
+date_added: '2026-10-16'
 ---
 
 ````
@@ -14,6 +14,7 @@ vr_agent
    │     └─ project-tree
    ├─ bin
    │  ├─ main.dart
+   │  ├─ vr_agent
    │  └─ vr_agent.exe
    ├─ deploy
    │  └─ systemd
@@ -85,6 +86,18 @@ vr_agent
    │  │  │  └─ presentation
    │  │  │     └─ cli
    │  │  │        └─ install_power_tools_command.dart
+   │  │  ├─ service
+   │  │  │  ├─ data
+   │  │  │  │  └─ repositories
+   │  │  │  │     └─ platform_system_service_installation_repository.dart
+   │  │  │  ├─ domain
+   │  │  │  │  ├─ repositories
+   │  │  │  │  │  └─ system_service_installation_repository.dart
+   │  │  │  │  └─ usecases
+   │  │  │  │     └─ install_system_service.dart
+   │  │  │  └─ presentation
+   │  │  │     └─ cli
+   │  │  │        └─ install_system_service_command.dart
    │  │  ├─ terminal
    │  │  │  ├─ data
    │  │  │  │  └─ repositories
