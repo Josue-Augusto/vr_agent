@@ -73,6 +73,22 @@ Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStderr', (Join-Path $logDirect
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateFiles', '1')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateOnline', '1')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRotateBytes', '10485760')
+
+$escapedLogDirectory = $logDirectory.Replace("'", "''")
+$cleanupCommand = "`$logDirectory = '$escapedLogDirectory'; Get-ChildItem -LiteralPath `$logDirectory -File | Where-Object { `$_.Name -match '^service-(out|error)-\d{8}T\d{6}\.\d{3}\.log$' } | Remove-Item -Force -ErrorAction Stop"
+$encodedCleanupCommand = [Convert]::ToBase64String(
+    [Text.Encoding]::Unicode.GetBytes($cleanupCommand)
+)
+$cleanupTaskName = "$ServiceName-LogCleanup"
+$cleanupTaskRun = "`"$PSHOME\powershell.exe`" -NoProfile -NonInteractive -EncodedCommand $encodedCleanupCommand"
+& schtasks.exe /Create /TN $cleanupTaskName /SC DAILY /MO 1 /ST 00:00 /TR $cleanupTaskRun /RU SYSTEM /F
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to register the rotated log cleanup task '$cleanupTaskName' (exit code $LASTEXITCODE)."
+}
+Get-ChildItem -LiteralPath $logDirectory -File |
+    Where-Object { $_.Name -match '^service-(out|error)-\d{8}T\d{6}\.\d{3}\.log$' } |
+    Remove-Item -Force
+
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppExit', 'Default', 'Restart')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppRestartDelay', '5000')
 Invoke-Nssm -Arguments @('set', $ServiceName, 'AppStopMethodConsole', '300000')

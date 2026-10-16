@@ -33,6 +33,11 @@ void main() {
         expect(script, contains("\$service.Status -ne 'Stopped'"));
         expect(script, contains('Get-ServiceStartupDiagnostics'));
         expect(script, contains("'service-error.log'"));
+        expect(script, contains(r'service-(out|error)-\d{8}T\d{6}\.\d{3}\.log'));
+        expect(script, contains('Get-ChildItem -LiteralPath \$logDirectory -File'));
+        expect(script, contains('schtasks.exe /Create'));
+        expect(script, contains('/SC DAILY /MO 1 /ST 00:00'));
+        expect(script, contains('\$ServiceName-LogCleanup'));
         expect(script, contains("\$service.Status -ne 'Running'"));
         expect(script, contains('\$wingetExitCode = \$LASTEXITCODE'));
         expect(script, contains('if (-not \$NssmPath -and \$wingetExitCode -ne 0)'));

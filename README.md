@@ -96,8 +96,13 @@ C:\vr\agent\vr_agent.exe -a -install -service
 O comando cria `C:\vr\agent\install-service.ps1`, instala NSSM pelo `winget`
 se ele ainda não estiver disponível, registra/inicia `VRAgent` e configura
 inicialização automática, reinício após falha, parada por Ctrl+C e rotação de
-logs em `C:\vr\agent\logs`. O script gerado também pode ser executado diretamente
-como administrador. Se não houver `winget`, instale NSSM manualmente e use
+logs em `C:\vr\agent\logs`. Quando um log atinge 10 MiB, o NSSM o rotaciona e
+cria um arquivo com timestamp no nome; uma tarefa agendada do Windows remove
+diariamente à meia-noite esses arquivos rotacionados, mantendo os arquivos de
+saída e erro atuais (além do intervalo até a próxima limpeza). O instalador também
+remove arquivos rotacionados existentes. O script gerado
+também pode ser executado diretamente como administrador. Se não houver
+`winget`, instale NSSM manualmente e use
 `.\install-service.ps1 -NssmPath <caminho-do-nssm.exe>`.
 Uma agenda `.crontab` vazia é iniciada como uma lista sem tarefas.
 Se a inicialização falhar, o instalador informa o estado do serviço e as últimas

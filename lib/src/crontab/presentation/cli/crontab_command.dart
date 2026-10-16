@@ -27,7 +27,7 @@ class CrontabCommand {
           throw const FormatException('Uma tarefa do .crontab não é um objeto JSON.');
         }
         stdout.writeln(
-          '${task['id']} | ${task['enabled'] == true ? 'habilitada' : 'desabilitada'} '
+          '${task['id']} | ${task['enabled'] == true ? 'on' : 'off'} '
           '| ${task['schedule']} (${task['timezone']}) | ${task['command']} '
           '| ${task['name']}',
         );
