@@ -33,8 +33,19 @@ seus fusos IANA. O comando da tarefa começa com `-a` para comandos nativos
 suportados pelo agente (`-a -version`, `-a -info`) ou `-p` para encaminhar a flag
 ao PowerTools (`-p -backup`). Cada tentativa e suas saídas são registradas em
 `agent_task_runs` quando iniciadas pelo agendador; estado e erros recentes são
-atualizados em `agent_tasks`. Chamadas `-p` feitas diretamente na CLI exibem a
-resposta do PowerTools, mas não criam um registro de tarefa agendada.
+atualizados em `agent_tasks`. Os horários dos logs usam o fuso configurado na
+tarefa, e cada registro em `agent_task_runs` guarda esse identificador na coluna
+`timezone`; `started_at` e `finished_at` continuam como `TIMESTAMPTZ` (instantes
+absolutos) e podem ser exibidos no fuso da tarefa usando essa coluna. Em bancos
+existentes, adicione a coluna antes de atualizar o agente:
+
+```sql
+ALTER TABLE agent_task_runs
+    ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) NOT NULL DEFAULT 'UTC';
+```
+
+Chamadas `-p` feitas diretamente na CLI exibem a resposta do PowerTools, mas não
+criam um registro de tarefa agendada.
 Sincronize o arquivo com `-a -update -crontab` antes de iniciar o modo contínuo.
 Sem argumentos, ou com `--service`, o agente permanece ativo e aguarda os próximos
 minutos agendados; quando não há tarefas habilitadas, permanece ocioso. As tarefas

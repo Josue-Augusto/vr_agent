@@ -25,12 +25,14 @@ class PostgresCrontabRepository implements CrontabRepository {
     required String triggeredBy,
   }) async {
     final rows = await connectionRepository.execute(
-      'INSERT INTO agent_task_runs (task_id, server_id, status, attempt, triggered_by) '
-      'VALUES (\$1, \$2, \'running\', \$3, \$4) RETURNING id',
-      parameters: [task.id, task.serverId, attempt, triggeredBy],
+      'INSERT INTO agent_task_runs (task_id, server_id, timezone, status, attempt, triggered_by) '
+      'VALUES (\$1, \$2, \$3, \'running\', \$4, \$5) RETURNING id',
+      parameters: [task.id, task.serverId, task.timezone, attempt, triggeredBy],
     );
     if (rows.isEmpty || rows.first['id'] is! num) {
-      throw StateError('O banco não retornou o identificador da execução da tarefa ${task.id}.');
+      throw StateError(
+        'O banco não retornou o identificador da execução da tarefa ${task.id}.',
+      );
     }
     return (rows.first['id'] as num).toInt();
   }

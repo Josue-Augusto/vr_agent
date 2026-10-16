@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' as io;
 
+import 'package:timezone/data/latest.dart' as timezone_data;
+import 'package:timezone/timezone.dart' as timezone;
 import 'package:vr_agent/src/crontab/domain/entities/agent_task.dart';
 import 'package:vr_agent/src/crontab/domain/entities/task_run_result.dart';
 import 'package:vr_agent/src/crontab/domain/repositories/crontab_repository.dart';
@@ -10,16 +12,21 @@ class RunCrontabTask {
   final CrontabRepository crontabRepository;
   final TaskCommandRunner taskCommandRunner;
 
-  const RunCrontabTask({
+  RunCrontabTask({
     required this.crontabRepository,
     required this.taskCommandRunner,
-  });
+  }) {
+    timezone_data.initializeTimeZones();
+  }
 
   Future<void> call(AgentTask task) async {
+    final location = timezone.getLocation(
+      task.timezone == 'UTC' ? 'Etc/UTC' : task.timezone,
+    );
     for (var attempt = 1; attempt <= task.maxRetries + 1; attempt++) {
-      final startedAt = DateTime.now().toUtc();
+      final startedAt = timezone.TZDateTime.now(location);
       io.stdout.writeln(
-        '[${startedAt.toIso8601String()}] Starting scheduled task '
+        '[${_formatTimestamp(startedAt)} ${task.timezone}] Starting scheduled task '
         '${task.id} (${task.name}), attempt $attempt.',
       );
       final runId = await crontabRepository.startTaskRun(
@@ -66,19 +73,45 @@ class RunCrontabTask {
         stderr: result.stderr,
         errorMessage: errorMessage,
       );
-      final finishedAt = DateTime.now().toUtc().toIso8601String();
+      final finishedAt = timezone.TZDateTime.now(location);
+      final finishedTimestamp = _formatTimestamp(finishedAt);
       if (status == 'success') {
         io.stdout.writeln(
-          '[$finishedAt] Scheduled task ${task.id} (${task.name}) completed successfully.',
+          '[$finishedTimestamp ${task.timezone}] Scheduled task '
+          '${task.id} (${task.name}) completed successfully.',
         );
       } else {
         io.stderr.writeln(
-          '[$finishedAt] Scheduled task ${task.id} (${task.name}) '
+          '[$finishedTimestamp ${task.timezone}] Scheduled task '
+          '${task.id} (${task.name}) '
           'ended with status "$status": $errorMessage',
         );
       }
       if (status == 'success' || attempt > task.maxRetries) return;
       await Future<void>.delayed(Duration(seconds: task.retryDelaySeconds));
     }
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final offset = timestamp.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final absoluteOffset = offset.abs();
+    final offsetHours = absoluteOffset.inHours.toString().padLeft(2, '0');
+    final offsetMinutes = (absoluteOffset.inMinutes % 60).toString().padLeft(
+      2,
+      '0',
+    );
+    final localIsoTimestamp = DateTime.utc(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+      timestamp.hour,
+      timestamp.minute,
+      timestamp.second,
+      timestamp.millisecond,
+      timestamp.microsecond,
+    ).toIso8601String();
+    return '${localIsoTimestamp.substring(0, localIsoTimestamp.length - 1)}'
+        '$sign$offsetHours:$offsetMinutes';
   }
 }

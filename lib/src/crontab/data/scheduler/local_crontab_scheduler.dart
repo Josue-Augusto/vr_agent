@@ -63,19 +63,25 @@ class LocalCrontabScheduler {
     final schedule = await filePathRepository.readJson(fileName: '.crontab');
     final tasks = schedule['tasks'];
     if (tasks is! List) {
-      throw const FormatException('O arquivo .crontab deve conter uma lista "tasks".');
+      throw const FormatException(
+        'O arquivo .crontab deve conter uma lista "tasks".',
+      );
     }
     final loadedTasks = tasks
         .map((task) {
           if (task is! Map<String, dynamic>) {
-            throw const FormatException('Cada tarefa do .crontab deve ser um objeto JSON.');
+            throw const FormatException(
+              'Cada tarefa do .crontab deve ser um objeto JSON.',
+            );
           }
           return AgentTask.fromJson(task);
         })
         .toList(growable: false);
     for (final task in loadedTasks.where((task) => task.enabled)) {
       CronExpression(task.schedule);
-      timezone.getLocation(task.timezone);
+      timezone.getLocation(
+        task.timezone == 'UTC' ? 'Etc/UTC' : task.timezone,
+      );
     }
     return loadedTasks;
   }
@@ -93,14 +99,18 @@ class LocalCrontabScheduler {
         if (!task.enabled || _runningTaskIds.contains(task.id)) continue;
         final key = '${task.id}:$minuteKey';
         if (_runsThisMinute.contains(key)) continue;
-        final location = timezone.getLocation(task.timezone);
+        final location = timezone.getLocation(
+          task.timezone == 'UTC' ? 'Etc/UTC' : task.timezone,
+        );
         final localTime = timezone.TZDateTime.from(now, location);
         if (!CronExpression(task.schedule).matches(localTime)) continue;
         _runsThisMinute.add(key);
         _runningTaskIds.add(task.id);
         final execution = _runTask(task);
         _runningTasks.add(execution);
-        unawaited(execution.whenComplete(() => _runningTasks.remove(execution)));
+        unawaited(
+          execution.whenComplete(() => _runningTasks.remove(execution)),
+        );
       }
     } catch (error, stackTrace) {
       io.stderr.writeln(
@@ -162,7 +172,8 @@ class LocalCrontabScheduler {
     if (_started && _timer == null) _scheduleNextCheck();
   }
 
-  String _minuteKey(DateTime dateTime) => '${dateTime.year}-${dateTime.month}-${dateTime.day}-${dateTime.hour}-${dateTime.minute}';
+  String _minuteKey(DateTime dateTime) =>
+      '${dateTime.year}-${dateTime.month}-${dateTime.day}-${dateTime.hour}-${dateTime.minute}';
 
   Future<void> _runTask(AgentTask task) async {
     try {

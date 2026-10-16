@@ -96,7 +96,8 @@ void main() {
   });
 
   test('reloads tasks when the crontab file changes', () async {
-    final filePath = _FakeFilePathRepository()..jsonToRead = {'tasks': <Object>[]};
+    final filePath = _FakeFilePathRepository()
+      ..jsonToRead = {'tasks': <Object>[]};
     final reloaded = Completer<void>();
     filePath.onRead = (readCount) {
       if (readCount == 2) reloaded.complete();
@@ -144,22 +145,25 @@ void main() {
     expect(filePath.writeFileName, '.crontab');
   });
 
-  test('PowerTools task prefix forwards arguments and captures output', () async {
-    final powerTools = _FakePowerToolsRepository();
-    final result = await AgentTaskCommandRunner(
-      powerToolsRepository: powerTools,
-      getAgentInfo: GetAgentInfo(
-        name: 'VR Agent',
-        version: '1.0.0',
-        platform: 'Linux',
-      ),
-    ).run(_task(command: '-p -backup --full'));
+  test(
+    'PowerTools task prefix forwards arguments and captures output',
+    () async {
+      final powerTools = _FakePowerToolsRepository();
+      final result = await AgentTaskCommandRunner(
+        powerToolsRepository: powerTools,
+        getAgentInfo: GetAgentInfo(
+          name: 'VR Agent',
+          version: '1.0.0',
+          platform: 'Linux',
+        ),
+      ).run(_task(command: '-p -backup --full'));
 
-    expect(powerTools.arguments, ['-backup', '--full']);
-    expect(powerTools.timeout, const Duration(seconds: 300));
-    expect(result.stdout, 'captured output');
-    expect(result.succeeded, isTrue);
-  });
+      expect(powerTools.arguments, ['-backup', '--full']);
+      expect(powerTools.timeout, const Duration(seconds: 300));
+      expect(result.stdout, 'captured output');
+      expect(result.succeeded, isTrue);
+    },
+  );
 
   test('runs Linux scheduled tasks as their configured user', () async {
     final invoker = _FakeScheduledCliInvoker();
@@ -183,25 +187,28 @@ void main() {
     expect(result.succeeded, isTrue);
   });
 
-  test('uses the configured Windows service identity for scheduled tasks', () async {
-    final powerTools = _FakePowerToolsRepository();
-    final invoker = _FakeScheduledCliInvoker();
-    final runner = AgentTaskCommandRunner(
-      powerToolsRepository: powerTools,
-      getAgentInfo: GetAgentInfo(
-        name: 'VR Agent',
-        version: '1.0.0',
-        platform: 'Windows',
-      ),
-      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
-      cliInvoker: invoker,
-    );
+  test(
+    'uses the configured Windows service identity for scheduled tasks',
+    () async {
+      final powerTools = _FakePowerToolsRepository();
+      final invoker = _FakeScheduledCliInvoker();
+      final runner = AgentTaskCommandRunner(
+        powerToolsRepository: powerTools,
+        getAgentInfo: GetAgentInfo(
+          name: 'VR Agent',
+          version: '1.0.0',
+          platform: 'Windows',
+        ),
+        platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+        cliInvoker: invoker,
+      );
 
-    await runner.run(_task(command: '-p -backup', runAsUser: 'ignored-user'));
+      await runner.run(_task(command: '-p -backup', runAsUser: 'ignored-user'));
 
-    expect(powerTools.arguments, ['-backup']);
-    expect(invoker.arguments, isNull);
-  });
+      expect(powerTools.arguments, ['-backup']);
+      expect(invoker.arguments, isNull);
+    },
+  );
 
   test('routes scheduled native updates through the CLI on Linux', () async {
     final invoker = _FakeScheduledCliInvoker();
@@ -243,59 +250,95 @@ void main() {
     expect(invoker.runAsUser, isNull);
   });
 
-  test('stores PowerTools output and exit code in the scheduled task run', () async {
-    final database = _FakeCrontabRepository();
-    final powerTools = _FakePowerToolsRepository()
-      ..result = const PowerToolsResult(
-        exitCode: 0,
-        stdout: 'Backup simulado.',
-        stderr: 'Aviso simulado.',
+  test(
+    'stores PowerTools output and exit code in the scheduled task run',
+    () async {
+      final database = _FakeCrontabRepository();
+      final powerTools = _FakePowerToolsRepository()
+        ..result = const PowerToolsResult(
+          exitCode: 0,
+          stdout: 'Backup simulado.',
+          stderr: 'Aviso simulado.',
+        );
+      final runner = AgentTaskCommandRunner(
+        powerToolsRepository: powerTools,
+        getAgentInfo: GetAgentInfo(
+          name: 'VR Agent',
+          version: '1.0.0',
+          platform: 'Linux',
+        ),
       );
-    final runner = AgentTaskCommandRunner(
-      powerToolsRepository: powerTools,
-      getAgentInfo: GetAgentInfo(
-        name: 'VR Agent',
-        version: '1.0.0',
-        platform: 'Linux',
-      ),
-    );
 
+      await RunCrontabTask(
+        crontabRepository: database,
+        taskCommandRunner: runner,
+      )(_task(command: '-p -backup'));
+
+      expect(powerTools.arguments, ['-backup']);
+      expect(database.finishedRuns, hasLength(1));
+      expect(database.finishedRuns.single['status'], 'success');
+      expect(database.finishedRuns.single['exitCode'], 0);
+      expect(database.finishedRuns.single['stdout'], 'Backup simulado.');
+      expect(database.finishedRuns.single['stderr'], 'Aviso simulado.');
+    },
+  );
+
+  test(
+    'uses a consistent varchar type for task status in PostgreSQL',
+    () async {
+      final connection = _FakeConnectionRepository();
+      final repository = PostgresCrontabRepository(
+        connectionRepository: connection,
+      );
+
+      await repository.startTaskRun(
+        task: _task(timezone: 'America/Sao_Paulo'),
+        attempt: 1,
+        triggeredBy: 'schedule',
+      );
+      await repository.finishTaskRun(
+        runId: 9,
+        task: _task(),
+        startedAt: DateTime.utc(2026, 10, 14),
+        status: 'success',
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+        errorMessage: null,
+      );
+
+      expect(connection.queries, hasLength(3));
+      expect(
+        connection.queries.first,
+        contains('task_id, server_id, timezone'),
+      );
+      expect(connection.queryParameters.first, [
+        3,
+        42,
+        'America/Sao_Paulo',
+        1,
+        'schedule',
+      ]);
+      expect(
+        connection.queries.last,
+        contains(r"$2::varchar = 'success'::varchar"),
+      );
+      expect(connection.queryParameters.last![1], 'success');
+    },
+  );
+
+  test('uses the task timezone for recorded start and finish times', () async {
+    final database = _FakeCrontabRepository();
     await RunCrontabTask(
       crontabRepository: database,
-      taskCommandRunner: runner,
-    )(_task(command: '-p -backup'));
+      taskCommandRunner: _RetryingTaskCommandRunner(),
+    )(
+      _task(timezone: 'America/Sao_Paulo'),
+    );
 
-    expect(powerTools.arguments, ['-backup']);
     expect(database.finishedRuns, hasLength(1));
-    expect(database.finishedRuns.single['status'], 'success');
-    expect(database.finishedRuns.single['exitCode'], 0);
-    expect(database.finishedRuns.single['stdout'], 'Backup simulado.');
-    expect(database.finishedRuns.single['stderr'], 'Aviso simulado.');
-  });
-
-  test('uses a consistent varchar type for task status in PostgreSQL', () async {
-    final connection = _FakeConnectionRepository();
-    final repository = PostgresCrontabRepository(
-      connectionRepository: connection,
-    );
-
-    await repository.finishTaskRun(
-      runId: 9,
-      task: _task(),
-      startedAt: DateTime.utc(2026, 10, 14),
-      status: 'success',
-      exitCode: 0,
-      stdout: '',
-      stderr: '',
-      errorMessage: null,
-    );
-
-    expect(connection.queries, hasLength(2));
-    expect(
-      connection.queries.last,
-      contains(r"$2::varchar = 'success'::varchar"),
-    );
-    expect(connection.queryParameters.last![1], 'success');
+    final startedAt = database.finishedRuns.single['startedAt'] as DateTime;
+    expect(startedAt.timeZoneOffset, const Duration(hours: -3));
   });
 
   test('agent task prefix runs native agent version action', () async {
@@ -332,6 +375,7 @@ AgentTask _task({
   int maxRetries = 0,
   int retryDelaySeconds = 60,
   String? runAsUser,
+  String timezone = 'UTC',
 }) => AgentTask(
   id: 3,
   serverId: 42,
@@ -339,7 +383,7 @@ AgentTask _task({
   description: null,
   command: command,
   schedule: '* * * * *',
-  timezone: 'UTC',
+  timezone: timezone,
   enabled: true,
   timeoutSeconds: 300,
   maxRetries: maxRetries,
@@ -355,7 +399,8 @@ class _FakeFilePathRepository implements FilePathRepository {
   Map<String, dynamic>? writtenJson;
   int readCount = 0;
   void Function(int readCount)? onRead;
-  final StreamController<void> watchController = StreamController<void>.broadcast();
+  final StreamController<void> watchController =
+      StreamController<void>.broadcast();
 
   @override
   Future<Map<String, dynamic>> readJson({required String fileName}) async {
@@ -416,6 +461,7 @@ class _FakeCrontabRepository implements CrontabRepository {
     finishedRuns.add({
       'runId': runId,
       'taskId': task.id,
+      'startedAt': startedAt,
       'status': status,
       'exitCode': exitCode,
       'stdout': stdout,
@@ -448,6 +494,11 @@ class _FakeConnectionRepository implements ConnectionRepository {
   }) async {
     queries.add(query);
     queryParameters.add(parameters);
+    if (query.contains('RETURNING id')) {
+      return [
+        {'id': 9},
+      ];
+    }
     return [];
   }
 
@@ -458,7 +509,8 @@ class _FakeConnectionRepository implements ConnectionRepository {
   bool isVerifiedFor(ConnectionConfig config) => false;
 
   @override
-  Future<void> reconnect({String? user, String? password}) => throw UnimplementedError();
+  Future<void> reconnect({String? user, String? password}) =>
+      throw UnimplementedError();
 }
 
 class _FakePowerToolsRepository implements PowerToolsRepository {
