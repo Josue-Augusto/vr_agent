@@ -91,20 +91,34 @@ class GoogleDrivePowerToolsBinaryInstaller implements PowerToolsBinaryInstaller 
         }
       }
 
-      if (expectedVersion != null) {
-        await _validateDownloadedBinary(
-          temporary.path,
-          expectedVersion: expectedVersion,
-        );
-      }
-
       if (await target.exists()) {
         await target.rename(backup.path);
         targetMovedToBackup = true;
       }
+      var temporaryMovedToTarget = false;
       try {
         await temporary.rename(target.path);
+        temporaryMovedToTarget = true;
+        if (expectedVersion != null) {
+          await _validateDownloadedBinary(
+            target.path,
+            expectedVersion: expectedVersion,
+          );
+        }
       } catch (error, stackTrace) {
+        if (temporaryMovedToTarget) {
+          try {
+            await target.delete();
+          } catch (deleteError, deleteStackTrace) {
+            Error.throwWithStackTrace(
+              StateError(
+                'Não foi possível validar o novo PowerTools ($error) nem '
+                'remover o binário inválido ($deleteError).',
+              ),
+              deleteStackTrace,
+            );
+          }
+        }
         if (targetMovedToBackup) {
           try {
             await backup.rename(target.path);

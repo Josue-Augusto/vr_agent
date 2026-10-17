@@ -31,12 +31,16 @@ void main() {
         ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
       ]);
       final target = File('${directory.path}/PowerTools.exe');
+      String? validatedPath;
       await target.writeAsBytes([9, 9]);
 
       try {
         await GoogleDrivePowerToolsBinaryInstaller(
           dio: Dio()..httpClientAdapter = adapter,
-          versionReader: (_) async => 'PowerTools version 1.2.0',
+          versionReader: (path) async {
+            validatedPath = path;
+            return 'PowerTools version 1.2.0';
+          },
         ).install(
           repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
           executablePath: target.path,
@@ -45,6 +49,7 @@ void main() {
         );
 
         expect(await target.readAsBytes(), [1, 2, 3, 4]);
+        expect(validatedPath, target.path);
         expect(adapter.requestedUris.first.host, 'drive.usercontent.google.com');
         expect(adapter.requestedUris.first.path, '/download');
         expect(adapter.requestedUris.first.queryParameters['id'], 'file-123');
@@ -56,114 +61,152 @@ void main() {
       }
     });
 
-    test('rejects an outdated download without replacing the installed binary', () async {
-      final directory = await Directory.systemTemp.createTemp();
-      final adapter = _FakeHttpClientAdapter([
-        ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
-      ]);
-      final target = File('${directory.path}/PowerTools.exe');
-      await target.writeAsBytes([9, 9]);
+    test(
+      'restores the installed binary if Windows blocks version validation',
+      () async {
+        final directory = await Directory.systemTemp.createTemp();
+        final adapter = _FakeHttpClientAdapter([
+          ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
+        ]);
+        final target = File('${directory.path}/PowerTools.exe');
+        await target.writeAsBytes([9, 9]);
 
-      try {
-        await expectLater(
-          GoogleDrivePowerToolsBinaryInstaller(
-            dio: Dio()..httpClientAdapter = adapter,
-            versionReader: (_) async => 'PowerTools version 1.0.19',
-          ).install(
-            repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
-            executablePath: target.path,
-            platform: PlatformInfo.fromOperatingSystem('windows'),
-            expectedVersion: '1.0.20',
-          ),
-          throwsA(
-            isA<StateError>().having(
-              (error) => error.message,
-              'message',
-              contains('contém PowerTools 1.0.19'),
+        try {
+          await expectLater(
+            GoogleDrivePowerToolsBinaryInstaller(
+              dio: Dio()..httpClientAdapter = adapter,
+              versionReader: (_) async {
+                throw ProcessException(
+                  'PowerTools.exe',
+                  ['-version'],
+                  'A política de Controle de Aplicativo bloqueou este arquivo',
+                  1260,
+                );
+              },
+            ).install(
+              repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
+              executablePath: target.path,
+              platform: PlatformInfo.fromOperatingSystem('windows'),
+              expectedVersion: '1.2.0',
             ),
-          ),
-        );
-        expect(await target.readAsBytes(), [9, 9]);
-        expect(directory.listSync(), hasLength(1));
-      } finally {
-        await directory.delete(recursive: true);
-      }
+            throwsA(isA<ProcessException>()),
+          );
+          expect(await target.readAsBytes(), [9, 9]);
+          expect(directory.listSync(), hasLength(1));
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      },
+    );
+
+    test('rejects an outdated download without replacing the installed binary', () async {
+        final directory = await Directory.systemTemp.createTemp();
+        final adapter = _FakeHttpClientAdapter([
+          ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
+        ]);
+        final target = File('${directory.path}/PowerTools.exe');
+        await target.writeAsBytes([9, 9]);
+
+        try {
+          await expectLater(
+            GoogleDrivePowerToolsBinaryInstaller(
+              dio: Dio()..httpClientAdapter = adapter,
+              versionReader: (_) async => 'PowerTools version 1.0.19',
+            ).install(
+              repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
+              executablePath: target.path,
+              platform: PlatformInfo.fromOperatingSystem('windows'),
+              expectedVersion: '1.0.20',
+            ),
+            throwsA(
+              isA<StateError>().having(
+                (error) => error.message,
+                'message',
+                contains('contém PowerTools 1.0.19'),
+              ),
+            ),
+          );
+          expect(await target.readAsBytes(), [9, 9]);
+          expect(directory.listSync(), hasLength(1));
+        } finally {
+          await directory.delete(recursive: true);
+        }
     });
 
     test('rejects an HTML response without replacing the existing executable', () async {
-      final directory = await Directory.systemTemp.createTemp();
-      final adapter = _FakeHttpClientAdapter([
-        ResponseBody.fromString(
-          '<html>Google Drive error</html>',
-          HttpStatus.ok,
-          headers: {
-            Headers.contentTypeHeader: ['text/html'],
-          },
-        ),
-      ]);
-      final target = File('${directory.path}/PowerTools.exe');
-      await target.writeAsBytes([9, 9]);
-
-      try {
-        await expectLater(
-          GoogleDrivePowerToolsBinaryInstaller(
-            dio: Dio()..httpClientAdapter = adapter,
-          ).install(
-            repositoryUrl: 'https://drive.google.com/open?id=file-123',
-            executablePath: target.path,
-            platform: PlatformInfo.fromOperatingSystem('windows'),
+        final directory = await Directory.systemTemp.createTemp();
+        final adapter = _FakeHttpClientAdapter([
+          ResponseBody.fromString(
+            '<html>Google Drive error</html>',
+            HttpStatus.ok,
+            headers: {
+              Headers.contentTypeHeader: ['text/html'],
+            },
           ),
-          throwsA(isA<FormatException>()),
-        );
-        expect(await target.readAsBytes(), [9, 9]);
-      } finally {
-        await directory.delete(recursive: true);
-      }
+        ]);
+        final target = File('${directory.path}/PowerTools.exe');
+        await target.writeAsBytes([9, 9]);
+
+        try {
+          await expectLater(
+            GoogleDrivePowerToolsBinaryInstaller(
+              dio: Dio()..httpClientAdapter = adapter,
+            ).install(
+              repositoryUrl: 'https://drive.google.com/open?id=file-123',
+              executablePath: target.path,
+              platform: PlatformInfo.fromOperatingSystem('windows'),
+            ),
+            throwsA(isA<FormatException>()),
+          );
+          expect(await target.readAsBytes(), [9, 9]);
+        } finally {
+          await directory.delete(recursive: true);
+        }
     });
 
     test('follows the Google Drive confirmation form without a browser', () async {
-      final directory = await Directory.systemTemp.createTemp();
-      final adapter = _FakeHttpClientAdapter([
-        ResponseBody.fromString(
-          '''
+        final directory = await Directory.systemTemp.createTemp();
+        final adapter = _FakeHttpClientAdapter([
+          ResponseBody.fromString(
+            '''
           <html><form action="https://drive.google.com/uc">
             <input type="hidden" name="export" value="download">
             <input type="hidden" name="id" value="file-123">
             <input type="hidden" name="confirm" value="download-token">
           </form></html>
           ''',
-          HttpStatus.ok,
-          headers: {
-            Headers.contentTypeHeader: ['text/html'],
-            'set-cookie': ['download_warning_file-123=download-token; Path=/'],
-          },
-        ),
-        ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
-      ]);
-      final target = File('${directory.path}/PowerTools.exe');
+            HttpStatus.ok,
+            headers: {
+              Headers.contentTypeHeader: ['text/html'],
+              'set-cookie': ['download_warning_file-123=download-token; Path=/'],
+            },
+          ),
+          ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
+        ]);
+        final target = File('${directory.path}/PowerTools.exe');
 
-      try {
-        await GoogleDrivePowerToolsBinaryInstaller(
-          dio: Dio()..httpClientAdapter = adapter,
-        ).install(
-          repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
-          executablePath: target.path,
-          platform: PlatformInfo.fromOperatingSystem('windows'),
-        );
+        try {
+          await GoogleDrivePowerToolsBinaryInstaller(
+            dio: Dio()..httpClientAdapter = adapter,
+          ).install(
+            repositoryUrl: 'https://drive.google.com/file/d/file-123/view',
+            executablePath: target.path,
+            platform: PlatformInfo.fromOperatingSystem('windows'),
+          );
 
-        expect(adapter.requestedUris, hasLength(2));
-        expect(
-          adapter.requestedUris.last.queryParameters['confirm'],
-          'download-token',
-        );
-        expect(
-          adapter.requestedHeaders.last.values.join(';'),
-          contains('download_warning_file-123=download-token'),
-        );
-        expect(await target.readAsBytes(), [1, 2, 3, 4]);
-      } finally {
-        await directory.delete(recursive: true);
-      }
+          expect(adapter.requestedUris, hasLength(2));
+          expect(
+            adapter.requestedUris.last.queryParameters['confirm'],
+            'download-token',
+          );
+          expect(
+            adapter.requestedHeaders.last.values.join(';'),
+            contains('download_warning_file-123=download-token'),
+          );
+          expect(await target.readAsBytes(), [1, 2, 3, 4]);
+        } finally {
+          await directory.delete(recursive: true);
+        }
     });
   });
 
@@ -287,43 +330,43 @@ void main() {
     });
 
     test('does not mark update completed if downloaded binary is still old', () async {
-      final updateRepository = _FakePowerToolsUpdateRepository()
-        ..release = const PowerToolsRelease(
-          id: 12,
-          currentVersion: '1.0.0',
-          newVersion: '2.0.0',
-          repository: 'https://drive.google.com/file/d/example/view',
+        final updateRepository = _FakePowerToolsUpdateRepository()
+          ..release = const PowerToolsRelease(
+            id: 12,
+            currentVersion: '1.0.0',
+            newVersion: '2.0.0',
+            repository: 'https://drive.google.com/file/d/example/view',
+          );
+        final powerTools = _FakePowerToolsRepository()
+          ..results.addAll([
+            const PowerToolsResult(
+              exitCode: 0,
+              stdout: 'PowerTools version 1.0.0',
+              stderr: '',
+            ),
+            const PowerToolsResult(
+              exitCode: 0,
+              stdout: 'PowerTools version 1.0.0',
+              stderr: '',
+            ),
+          ]);
+
+        await expectLater(
+          _useCase(
+            powerToolsRepository: powerTools,
+            updateRepository: updateRepository,
+          )(),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              contains('continua na versão 1.0.0'),
+            ),
+          ),
         );
-      final powerTools = _FakePowerToolsRepository()
-        ..results.addAll([
-          const PowerToolsResult(
-            exitCode: 0,
-            stdout: 'PowerTools version 1.0.0',
-            stderr: '',
-          ),
-          const PowerToolsResult(
-            exitCode: 0,
-            stdout: 'PowerTools version 1.0.0',
-            stderr: '',
-          ),
-        ]);
 
-      await expectLater(
-        _useCase(
-          powerToolsRepository: powerTools,
-          updateRepository: updateRepository,
-        )(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            contains('continua na versão 1.0.0'),
-          ),
-        ),
-      );
-
-      expect(updateRepository.completedReleaseId, isNull);
-      expect(updateRepository.failedReleaseId, 12);
+        expect(updateRepository.completedReleaseId, isNull);
+        expect(updateRepository.failedReleaseId, 12);
       expect(updateRepository.errorMessage, contains('continua na versão 1.0.0'));
     });
 
@@ -558,7 +601,8 @@ class _FakeFilePathRepository implements FilePathRepository {
   }) => throw UnimplementedError();
 
   @override
-  Stream<void> watchFile({required String fileName}) => const Stream<void>.empty();
+  Stream<void> watchFile({required String fileName}) =>
+      const Stream<void>.empty();
 }
 
 class _FakePowerToolsRepository implements PowerToolsRepository {
