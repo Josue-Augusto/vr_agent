@@ -34,14 +34,13 @@ suportados pelo agente (`-a -version`, `-a -info`) ou `-p` para encaminhar a fla
 ao PowerTools (`-p -backup`). Cada tentativa e suas saídas são registradas em
 `agent_task_runs` quando iniciadas pelo agendador; estado e erros recentes são
 atualizados em `agent_tasks`. Os horários dos logs usam o fuso configurado na
-tarefa, e cada registro em `agent_task_runs` guarda esse identificador na coluna
-`timezone`; `started_at` e `finished_at` continuam como `TIMESTAMPTZ` (instantes
-absolutos) e podem ser exibidos no fuso da tarefa usando essa coluna. Em bancos
-existentes, adicione a coluna antes de atualizar o agente:
+tarefa durante a execução, mas esse fuso não é armazenado em `agent_task_runs`.
+`started_at` e `finished_at` são `TIMESTAMPTZ` (instantes absolutos). Em bancos
+existentes, a coluna `timezone` de `agent_task_runs` não é necessária e pode ser
+removida:
 
 ```sql
-ALTER TABLE agent_task_runs
-    ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) NOT NULL DEFAULT 'UTC';
+ALTER TABLE public.agent_task_runs DROP COLUMN IF EXISTS timezone;
 ```
 
 Chamadas `-p` feitas diretamente na CLI exibem a resposta do PowerTools, mas não

@@ -284,7 +284,7 @@ void main() {
   );
 
   test(
-    'uses a consistent varchar type for task status in PostgreSQL',
+    'records task runs without persisting the task timezone',
     () async {
       final connection = _FakeConnectionRepository();
       final repository = PostgresCrontabRepository(
@@ -310,15 +310,15 @@ void main() {
       expect(connection.queries, hasLength(3));
       expect(
         connection.queries.first,
-        contains('task_id, server_id, timezone'),
+        contains('task_id, server_id, status, attempt, triggered_by'),
       );
       expect(connection.queryParameters.first, [
         3,
         42,
-        'America/Sao_Paulo',
         1,
         'schedule',
       ]);
+      expect(connection.queries.first, isNot(contains('timezone')));
       expect(
         connection.queries.last,
         contains(r"$2::varchar = 'success'::varchar"),

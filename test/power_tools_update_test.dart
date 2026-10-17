@@ -15,8 +15,8 @@ import 'package:vr_agent/src/terminal/domain/repositories/power_tools_repository
 import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/command_registry.dart';
-import 'package:vr_agent/src/update/data/repositories/postgres_power_tools_update_repository.dart';
 import 'package:vr_agent/src/update/data/repositories/google_drive_power_tools_binary_installer.dart';
+import 'package:vr_agent/src/update/data/repositories/postgres_power_tools_update_repository.dart';
 import 'package:vr_agent/src/update/domain/entities/power_tools_release.dart';
 import 'package:vr_agent/src/update/domain/entities/power_tools_update_result.dart';
 import 'package:vr_agent/src/update/domain/repositories/power_tools_binary_installer.dart';
@@ -394,6 +394,7 @@ void main() {
 
     final release = await PostgresPowerToolsUpdateRepository(
       connectionRepository: connection,
+      platform: PlatformInfo.fromOperatingSystem('windows'),
     ).getLatestRelease(serverId: 42);
 
     expect(release?.id, 5);
@@ -407,8 +408,55 @@ void main() {
       connection.query,
       contains('new_version.id = au.new_version_id'),
     );
+    expect(
+      connection.query,
+      contains('new_version.link_windows AS repository'),
+    );
     expect(connection.query, contains('ORDER BY au.version_date DESC, au.id DESC'));
     expect(connection.parameters, [42]);
+  });
+
+  test('selects the Linux binary link for Linux', () async {
+    final connection = _FakeConnectionRepository()
+      ..rows = [
+        {
+          'id': 5,
+          'current_version': '1.0.0',
+          'new_version': '1.1.0',
+          'repository': 'https://drive.google.com/file/d/linux/view',
+        },
+      ];
+
+    final release = await PostgresPowerToolsUpdateRepository(
+      connectionRepository: connection,
+      platform: PlatformInfo.fromOperatingSystem('linux'),
+    ).getLatestRelease(serverId: 42);
+
+    expect(release?.repository, 'https://drive.google.com/file/d/linux/view');
+    expect(
+      connection.query,
+      contains('new_version.link_linux AS repository'),
+    );
+  });
+
+  test('rejects a release without a link for the current platform', () async {
+    final connection = _FakeConnectionRepository()
+      ..rows = [
+        {
+          'id': 5,
+          'current_version': '1.0.0',
+          'new_version': '1.1.0',
+          'repository': null,
+        },
+      ];
+
+    await expectLater(
+      PostgresPowerToolsUpdateRepository(
+        connectionRepository: connection,
+        platform: PlatformInfo.fromOperatingSystem('linux'),
+      ).getLatestRelease(serverId: 42),
+      throwsA(isA<FormatException>()),
+    );
   });
 
   test('updates the release row after completion and on failure', () async {
@@ -418,6 +466,7 @@ void main() {
       ];
     final repository = PostgresPowerToolsUpdateRepository(
       connectionRepository: connection,
+      platform: PlatformInfo.fromOperatingSystem('windows'),
     );
 
     await repository.markCompleted(releaseId: 5);

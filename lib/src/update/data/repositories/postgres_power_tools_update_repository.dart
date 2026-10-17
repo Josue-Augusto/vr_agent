@@ -1,19 +1,23 @@
 import 'package:vr_agent/src/connection/domain/repositories/connection_repository.dart';
+import 'package:vr_agent/src/core/tools/platform_info.dart';
 import 'package:vr_agent/src/update/domain/entities/power_tools_release.dart';
 import 'package:vr_agent/src/update/domain/repositories/power_tools_update_repository.dart';
 
 class PostgresPowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   final ConnectionRepository connectionRepository;
+  final PlatformInfo platform;
 
   const PostgresPowerToolsUpdateRepository({
     required this.connectionRepository,
+    required this.platform,
   });
 
   @override
   Future<PowerToolsRelease?> getLatestRelease({required int serverId}) async {
+    final linkColumn = platform.isWindows ? 'link_windows' : 'link_linux';
     final rows = await connectionRepository.execute(
       'SELECT au.id, current_version.current_version, '
-      'new_version.new_version, new_version.repository '
+      'new_version.new_version, new_version.$linkColumn AS repository '
       'FROM agent_update AS au '
       'LEFT JOIN agent_version AS current_version '
       'ON current_version.id = au.current_version_id '
@@ -26,7 +30,11 @@ class PostgresPowerToolsUpdateRepository implements PowerToolsUpdateRepository {
     if (rows.isEmpty) return null;
 
     final row = rows.first;
-    if (row['id'] is! num || row['current_version'] is! String || row['new_version'] is! String || row['repository'] is! String) {
+    if (row['id'] is! num ||
+        row['current_version'] is! String ||
+        row['new_version'] is! String ||
+        row['repository'] is! String ||
+        (row['repository'] as String).trim().isEmpty) {
       throw const FormatException(
         'O registro de atualização do PowerTools possui dados inválidos.',
       );

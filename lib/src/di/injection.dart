@@ -72,6 +72,7 @@ AppDependencies createAppDependencies({
     powerToolsRepository: toolsRepository,
     updateRepository: PostgresPowerToolsUpdateRepository(
       connectionRepository: connectionRepository,
+      platform: platform,
     ),
     binaryInstaller: powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
     executablePath: executablePath,
@@ -82,6 +83,7 @@ AppDependencies createAppDependencies({
     filePathRepository: fileRepository,
     updateRepository: PostgresPowerToolsUpdateRepository(
       connectionRepository: connectionRepository,
+      platform: platform,
     ),
     binaryInstaller: powerToolsBinaryInstaller ?? GoogleDrivePowerToolsBinaryInstaller(),
     executablePath: executablePath,
