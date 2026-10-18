@@ -50,7 +50,10 @@ void main() {
 
         expect(await target.readAsBytes(), [1, 2, 3, 4]);
         expect(validatedPath, target.path);
-        expect(adapter.requestedUris.first.host, 'drive.usercontent.google.com');
+        expect(
+          adapter.requestedUris.first.host,
+          'drive.usercontent.google.com',
+        );
         expect(adapter.requestedUris.first.path, '/download');
         expect(adapter.requestedUris.first.queryParameters['id'], 'file-123');
         final remainingFiles = directory.listSync();
@@ -99,7 +102,9 @@ void main() {
       },
     );
 
-    test('rejects an outdated download without replacing the installed binary', () async {
+    test(
+      'rejects an outdated download without replacing the installed binary',
+      () async {
         final directory = await Directory.systemTemp.createTemp();
         final adapter = _FakeHttpClientAdapter([
           ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
@@ -131,9 +136,12 @@ void main() {
         } finally {
           await directory.delete(recursive: true);
         }
-    });
+      },
+    );
 
-    test('rejects an HTML response without replacing the existing executable', () async {
+    test(
+      'rejects an HTML response without replacing the existing executable',
+      () async {
         final directory = await Directory.systemTemp.createTemp();
         final adapter = _FakeHttpClientAdapter([
           ResponseBody.fromString(
@@ -162,9 +170,12 @@ void main() {
         } finally {
           await directory.delete(recursive: true);
         }
-    });
+      },
+    );
 
-    test('follows the Google Drive confirmation form without a browser', () async {
+    test(
+      'follows the Google Drive confirmation form without a browser',
+      () async {
         final directory = await Directory.systemTemp.createTemp();
         final adapter = _FakeHttpClientAdapter([
           ResponseBody.fromString(
@@ -178,7 +189,9 @@ void main() {
             HttpStatus.ok,
             headers: {
               Headers.contentTypeHeader: ['text/html'],
-              'set-cookie': ['download_warning_file-123=download-token; Path=/'],
+              'set-cookie': [
+                'download_warning_file-123=download-token; Path=/',
+              ],
             },
           ),
           ResponseBody.fromBytes([1, 2, 3, 4], HttpStatus.ok),
@@ -207,7 +220,8 @@ void main() {
         } finally {
           await directory.delete(recursive: true);
         }
-    });
+      },
+    );
   });
 
   group('UpdatePowerTools', () {
@@ -329,7 +343,9 @@ void main() {
       expect(connection.closed, isTrue);
     });
 
-    test('does not mark update completed if downloaded binary is still old', () async {
+    test(
+      'does not mark update completed if downloaded binary is still old',
+      () async {
         final updateRepository = _FakePowerToolsUpdateRepository()
           ..release = const PowerToolsRelease(
             id: 12,
@@ -367,8 +383,12 @@ void main() {
 
         expect(updateRepository.completedReleaseId, isNull);
         expect(updateRepository.failedReleaseId, 12);
-      expect(updateRepository.errorMessage, contains('continua na versão 1.0.0'));
-    });
+        expect(
+          updateRepository.errorMessage,
+          contains('continua na versão 1.0.0'),
+        );
+      },
+    );
 
     test('does not reinstall an equal semantic version', () async {
       final installer = _FakePowerToolsBinaryInstaller();
@@ -394,6 +414,9 @@ void main() {
       expect(result.status, PowerToolsUpdateStatus.upToDate);
       expect(installer.repositoryUrl, isNull);
       expect(updateRepository.completedReleaseId, isNull);
+      expect(updateRepository.synchronizedReleaseId, 9);
+      expect(updateRepository.synchronizedVersion, '1.2');
+      expect(updateRepository.synchronizedServerId, 42);
     });
 
     test('records installation errors and rethrows them', () async {
@@ -414,7 +437,8 @@ void main() {
               stderr: '',
             ),
           updateRepository: updateRepository,
-          binaryInstaller: _FakePowerToolsBinaryInstaller()..error = StateError('download failed'),
+          binaryInstaller: _FakePowerToolsBinaryInstaller()
+            ..error = StateError('download failed'),
         )(),
         throwsA(isA<StateError>()),
       );
@@ -455,7 +479,10 @@ void main() {
       connection.query,
       contains('new_version.link_windows AS repository'),
     );
-    expect(connection.query, contains('ORDER BY au.version_date DESC, au.id DESC'));
+    expect(
+      connection.query,
+      contains('ORDER BY au.version_date DESC, au.id DESC'),
+    );
     expect(connection.parameters, [42]);
   });
 
@@ -526,6 +553,66 @@ void main() {
     expect(connection.parameters?[0], 'failed');
     expect(connection.parameters?[2], 'download failed');
   });
+
+  test(
+    'synchronizes current version ID to the matching agent version',
+    () async {
+      final connection = _FakeConnectionRepository()
+        ..rows = [
+          {'version_id': 7, 'current_version_id': 7},
+        ];
+      final repository = PostgresPowerToolsUpdateRepository(
+        connectionRepository: connection,
+        platform: PlatformInfo.fromOperatingSystem('windows'),
+      );
+
+      await repository.synchronizeCurrentVersion(
+        releaseId: 5,
+        currentVersion: '1.0.31',
+        serverId: 42,
+      );
+
+      expect(connection.parameters, ['1.0.31', 5, 42]);
+      expect(connection.query, contains('new_version = \$1'));
+      expect(
+        connection.query,
+        contains('SET current_version_id = version_to_sync.id'),
+      );
+      expect(connection.query, contains('au.server_id = \$3'));
+      expect(
+        connection.query,
+        contains('au.current_version_id IS DISTINCT FROM version_to_sync.id'),
+      );
+    },
+  );
+
+  test(
+    'reports when current PowerTools version is missing from agent_version',
+    () async {
+      final connection = _FakeConnectionRepository()
+        ..rows = [
+          {'version_id': null, 'current_version_id': null},
+        ];
+
+      await expectLater(
+        PostgresPowerToolsUpdateRepository(
+          connectionRepository: connection,
+          platform: PlatformInfo.fromOperatingSystem('windows'),
+        ).synchronizeCurrentVersion(
+          releaseId: 5,
+          currentVersion: '1.0.31',
+          serverId: 42,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('não foi encontrada'),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 UpdatePowerTools _useCase({
@@ -536,7 +623,9 @@ UpdatePowerTools _useCase({
   PowerToolsBinaryInstaller? binaryInstaller,
 }) => UpdatePowerTools(
   connectionRepository: connectionRepository ?? _FakeConnectionRepository(),
-  filePathRepository: filePathRepository ?? (_FakeFilePathRepository()..config = {'server_id': 42}),
+  filePathRepository:
+      filePathRepository ??
+      (_FakeFilePathRepository()..config = {'server_id': 42}),
   powerToolsRepository:
       powerToolsRepository ??
       (_FakePowerToolsRepository()
@@ -585,14 +674,16 @@ class _FakeConnectionRepository implements ConnectionRepository {
   bool isVerifiedFor(ConnectionConfig config) => false;
 
   @override
-  Future<void> reconnect({String? user, String? password}) => throw UnimplementedError();
+  Future<void> reconnect({String? user, String? password}) =>
+      throw UnimplementedError();
 }
 
 class _FakeFilePathRepository implements FilePathRepository {
   Map<String, dynamic> config = {};
 
   @override
-  Future<Map<String, dynamic>> readJson({required String fileName}) async => config;
+  Future<Map<String, dynamic>> readJson({required String fileName}) async =>
+      config;
 
   @override
   Future<void> writeJson({
@@ -628,6 +719,9 @@ class _FakePowerToolsRepository implements PowerToolsRepository {
 class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   PowerToolsRelease? release;
   int? requestedServerId;
+  int? synchronizedReleaseId;
+  String? synchronizedVersion;
+  int? synchronizedServerId;
   int? completedReleaseId;
   int? failedReleaseId;
   String? errorMessage;
@@ -636,6 +730,17 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   Future<PowerToolsRelease?> getLatestRelease({required int serverId}) async {
     requestedServerId = serverId;
     return release;
+  }
+
+  @override
+  Future<void> synchronizeCurrentVersion({
+    required int releaseId,
+    required String currentVersion,
+    required int serverId,
+  }) async {
+    synchronizedReleaseId = releaseId;
+    synchronizedVersion = currentVersion;
+    synchronizedServerId = serverId;
   }
 
   @override

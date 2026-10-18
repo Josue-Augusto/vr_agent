@@ -48,6 +48,59 @@ class PostgresPowerToolsUpdateRepository implements PowerToolsUpdateRepository {
   }
 
   @override
+  Future<void> synchronizeCurrentVersion({
+    required int releaseId,
+    required String currentVersion,
+    required int serverId,
+  }) async {
+    final rows = await connectionRepository.execute(
+      'WITH version_to_sync AS ('
+      'SELECT id FROM agent_version WHERE new_version = \$1 '
+      'ORDER BY created_at DESC, id DESC LIMIT 1'
+      '), updated AS ('
+      'UPDATE agent_update AS au '
+      'SET current_version_id = version_to_sync.id '
+      'FROM version_to_sync '
+      'WHERE au.id = \$2 '
+      'AND au.server_id = \$3 '
+      'AND au.current_version_id IS DISTINCT FROM version_to_sync.id '
+      'RETURNING au.id, au.current_version_id'
+      ') '
+      'SELECT version_to_sync.id AS version_id, '
+      'COALESCE(updated.current_version_id, au.current_version_id) '
+      'AS current_version_id '
+      'FROM agent_update AS au '
+      'LEFT JOIN version_to_sync ON TRUE '
+      'LEFT JOIN updated ON updated.id = au.id '
+      'WHERE au.id = \$2 AND au.server_id = \$3',
+      parameters: [currentVersion, releaseId, serverId],
+    );
+    if (rows.isEmpty) {
+      throw StateError(
+        'O registro de atualização $releaseId não foi encontrado ao '
+        'sincronizar a versão atual do PowerTools.',
+      );
+    }
+
+    final row = rows.first;
+    final versionId = row['version_id'];
+    final currentVersionId = row['current_version_id'];
+    if (versionId is! num) {
+      throw StateError(
+        'A versão $currentVersion do PowerTools não foi encontrada em '
+        'agent_version.new_version.',
+      );
+    }
+    if (currentVersionId is! num ||
+        currentVersionId.toInt() != versionId.toInt()) {
+      throw StateError(
+        'Não foi possível sincronizar o ID da versão atual do PowerTools '
+        'no registro de atualização $releaseId.',
+      );
+    }
+  }
+
+  @override
   Future<void> markCompleted({
     required int releaseId,
   }) async {

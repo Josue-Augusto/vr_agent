@@ -13,48 +13,54 @@ import 'package:vr_agent/src/update/domain/repositories/power_tools_update_repos
 
 void main() {
   group('InstallPowerTools', () {
-    test('does not access the database when PowerTools already exists', () async {
-      final connection = _FakeConnectionRepository();
-      final updates = _FakePowerToolsUpdateRepository();
-      final installer = _FakePowerToolsBinaryInstaller()..installed = true;
+    test(
+      'does not access the database when PowerTools already exists',
+      () async {
+        final connection = _FakeConnectionRepository();
+        final updates = _FakePowerToolsUpdateRepository();
+        final installer = _FakePowerToolsBinaryInstaller()..installed = true;
 
-      final result = await _useCase(
-        connection: connection,
-        updates: updates,
-        installer: installer,
-      )();
+        final result = await _useCase(
+          connection: connection,
+          updates: updates,
+          installer: installer,
+        )();
 
-      expect(result.status, PowerToolsInstallStatus.alreadyInstalled);
-      expect(connection.initialized, isFalse);
-      expect(updates.requestedServerId, isNull);
-      expect(installer.downloadedUrl, isNull);
-    });
+        expect(result.status, PowerToolsInstallStatus.alreadyInstalled);
+        expect(connection.initialized, isFalse);
+        expect(updates.requestedServerId, isNull);
+        expect(installer.downloadedUrl, isNull);
+      },
+    );
 
-    test('downloads the release for this server and updates the database', () async {
-      final connection = _FakeConnectionRepository();
-      final updates = _FakePowerToolsUpdateRepository()
-        ..release = const PowerToolsRelease(
-          id: 7,
-          currentVersion: '1.0.0',
-          newVersion: '2.1.0',
-          repository: 'https://drive.google.com/file/d/powertools/view',
-        );
-      final installer = _FakePowerToolsBinaryInstaller();
+    test(
+      'downloads the release for this server and updates the database',
+      () async {
+        final connection = _FakeConnectionRepository();
+        final updates = _FakePowerToolsUpdateRepository()
+          ..release = const PowerToolsRelease(
+            id: 7,
+            currentVersion: '1.0.0',
+            newVersion: '2.1.0',
+            repository: 'https://drive.google.com/file/d/powertools/view',
+          );
+        final installer = _FakePowerToolsBinaryInstaller();
 
-      final result = await _useCase(
-        connection: connection,
-        updates: updates,
-        installer: installer,
-      )();
+        final result = await _useCase(
+          connection: connection,
+          updates: updates,
+          installer: installer,
+        )();
 
-      expect(result.status, PowerToolsInstallStatus.installed);
-      expect(result.version, '2.1.0');
-      expect(connection.initialized, isTrue);
-      expect(connection.closed, isTrue);
-      expect(updates.requestedServerId, 42);
-      expect(installer.downloadedUrl, contains('drive.google.com'));
-      expect(updates.completedReleaseId, 7);
-    });
+        expect(result.status, PowerToolsInstallStatus.installed);
+        expect(result.version, '2.1.0');
+        expect(connection.initialized, isTrue);
+        expect(connection.closed, isTrue);
+        expect(updates.requestedServerId, 42);
+        expect(installer.downloadedUrl, contains('drive.google.com'));
+        expect(updates.completedReleaseId, 7);
+      },
+    );
 
     test('marks a failed installation in the database', () async {
       final updates = _FakePowerToolsUpdateRepository()
@@ -64,7 +70,8 @@ void main() {
           newVersion: '2.1.0',
           repository: 'https://drive.google.com/file/d/powertools/view',
         );
-      final installer = _FakePowerToolsBinaryInstaller()..error = StateError('download failed');
+      final installer = _FakePowerToolsBinaryInstaller()
+        ..error = StateError('download failed');
 
       await expectLater(
         _useCase(updates: updates, installer: installer)(),
@@ -75,30 +82,33 @@ void main() {
       expect(updates.failure, contains('download failed'));
     });
 
-    test('routes PowerTools installation through the explicit install selector', () async {
-      List<String>? receivedArguments;
-      final registry = CommandRegistry()
-        ..register(
-          AgentCommand(
-            name: '-install',
-            description: 'Install PowerTools',
-            action: (arguments) async {
-              receivedArguments = arguments;
-              return 17;
-            },
-          ),
-        )
-        ..register(
-          AgentCommand(
-            name: '-help',
-            description: 'Help',
-            action: (_) async => 0,
-          ),
-        );
+    test(
+      'routes PowerTools installation through the explicit install selector',
+      () async {
+        List<String>? receivedArguments;
+        final registry = CommandRegistry()
+          ..register(
+            AgentCommand(
+              name: '-install',
+              description: 'Install PowerTools',
+              action: (arguments) async {
+                receivedArguments = arguments;
+                return 17;
+              },
+            ),
+          )
+          ..register(
+            AgentCommand(
+              name: '-help',
+              description: 'Help',
+              action: (_) async => 0,
+            ),
+          );
 
-      expect(await registry.run(['-a', '-install', '-powertools']), 17);
-      expect(receivedArguments, ['-powertools']);
-    });
+        expect(await registry.run(['-a', '-install', '-powertools']), 17);
+        expect(receivedArguments, ['-powertools']);
+      },
+    );
   });
 }
 
@@ -109,7 +119,8 @@ InstallPowerTools _useCase({
   _FakePowerToolsBinaryInstaller? installer,
 }) => InstallPowerTools(
   connectionRepository: connection ?? _FakeConnectionRepository(),
-  filePathRepository: files ?? (_FakeFilePathRepository()..config = {'server_id': 42}),
+  filePathRepository:
+      files ?? (_FakeFilePathRepository()..config = {'server_id': 42}),
   updateRepository: updates ?? _FakePowerToolsUpdateRepository()
     ..release = const PowerToolsRelease(
       id: 7,
@@ -149,14 +160,16 @@ class _FakeConnectionRepository implements ConnectionRepository {
   bool isVerifiedFor(ConnectionConfig config) => false;
 
   @override
-  Future<void> reconnect({String? user, String? password}) => throw UnimplementedError();
+  Future<void> reconnect({String? user, String? password}) =>
+      throw UnimplementedError();
 }
 
 class _FakeFilePathRepository implements FilePathRepository {
   Map<String, dynamic> config = {};
 
   @override
-  Future<Map<String, dynamic>> readJson({required String fileName}) async => config;
+  Future<Map<String, dynamic>> readJson({required String fileName}) async =>
+      config;
 
   @override
   Future<void> writeJson({
@@ -165,7 +178,8 @@ class _FakeFilePathRepository implements FilePathRepository {
   }) => throw UnimplementedError();
 
   @override
-  Stream<void> watchFile({required String fileName}) => const Stream<void>.empty();
+  Stream<void> watchFile({required String fileName}) =>
+      const Stream<void>.empty();
 }
 
 class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
@@ -180,6 +194,13 @@ class _FakePowerToolsUpdateRepository implements PowerToolsUpdateRepository {
     requestedServerId = serverId;
     return release;
   }
+
+  @override
+  Future<void> synchronizeCurrentVersion({
+    required int releaseId,
+    required String currentVersion,
+    required int serverId,
+  }) async {}
 
   @override
   Future<void> markCompleted({

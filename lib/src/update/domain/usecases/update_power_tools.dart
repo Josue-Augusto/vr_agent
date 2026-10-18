@@ -60,6 +60,11 @@ class UpdatePowerTools {
         await _recordFailure(release.id, error, stackTrace);
       }
       if (_compareVersions(newVersion, currentVersion) <= 0) {
+        await updateRepository.synchronizeCurrentVersion(
+          releaseId: release.id,
+          currentVersion: currentVersion,
+          serverId: serverId,
+        );
         return PowerToolsUpdateResult(
           status: PowerToolsUpdateStatus.upToDate,
           currentVersion: currentVersion,
@@ -167,7 +172,9 @@ class UpdatePowerTools {
   int _compareVersions(String left, String right) {
     final leftParts = left.split('.').map(int.parse).toList(growable: false);
     final rightParts = right.split('.').map(int.parse).toList(growable: false);
-    final length = leftParts.length > rightParts.length ? leftParts.length : rightParts.length;
+    final length = leftParts.length > rightParts.length
+        ? leftParts.length
+        : rightParts.length;
     for (var index = 0; index < length; index++) {
       final leftPart = index < leftParts.length ? leftParts[index] : 0;
       final rightPart = index < rightParts.length ? rightParts[index] : 0;
