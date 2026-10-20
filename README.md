@@ -13,6 +13,7 @@ vr_agent -a -update -crontab
 vr_agent -a -crontab
 vr_agent -a -install -powertools
 vr_agent -a -install -service
+vr_agent -a -install -certificate
 vr_agent -p -backup
 vr_agent -a -help
 vr_agent --service
@@ -42,6 +43,10 @@ removida:
 ```sql
 ALTER TABLE public.agent_task_runs DROP COLUMN IF EXISTS timezone;
 ```
+
+No Windows, `-a -install -certificate` instala o certificado embutido no
+executável no repositório de certificados raiz da máquina. O comando requer
+privilégios de administrador e não é válido no Linux.
 
 Chamadas `-p` feitas diretamente na CLI exibem a resposta do PowerTools, mas não
 criam um registro de tarefa agendada.
@@ -89,6 +94,7 @@ PowerShell como administrador:
 ```powershell
 New-Item -ItemType Directory -Path C:\vr\agent -Force
 dart compile exe bin\main.dart -o C:\vr\agent\vr_agent.exe
+C:\vr\agent\vr_agent.exe -a -install -certificate
 C:\vr\agent\vr_agent.exe -a -install -service
 ```
 

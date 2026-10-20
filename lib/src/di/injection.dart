@@ -1,4 +1,8 @@
 import 'package:vr_agent/core/constants/app_constants.dart';
+import 'package:vr_agent/src/certificate/data/embedded_certificate.dart';
+import 'package:vr_agent/src/certificate/data/repositories/windows_certificate_installation_repository.dart';
+import 'package:vr_agent/src/certificate/domain/repositories/certificate_installation_repository.dart';
+import 'package:vr_agent/src/certificate/domain/usecases/install_certificate.dart';
 import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
 import 'package:vr_agent/src/connection/data/repositories/connection_repository_impl.dart';
 import 'package:vr_agent/src/core/tools/platform_info.dart';
@@ -50,6 +54,7 @@ AppDependencies createAppDependencies({
   PowerToolsRepository? powerToolsRepository,
   PowerToolsBinaryInstaller? powerToolsBinaryInstaller,
   SystemServiceInstallationRepository? systemServiceInstallationRepository,
+  CertificateInstallationRepository? certificateInstallationRepository,
   Duration healthCheckInterval = const Duration(seconds: 30),
 }) {
   final platform = platformInfo ?? PlatformInfo.current;
@@ -122,6 +127,12 @@ AppDependencies createAppDependencies({
   final installSystemService = InstallSystemService(
     systemServiceInstallationRepository ?? PlatformSystemServiceInstallationRepository(platform: platform),
   );
+  final installCertificate = InstallCertificate(
+    platform: platform,
+    repository: certificateInstallationRepository ??
+        const WindowsCertificateInstallationRepository(),
+    certificateBytes: embeddedCertificateBytes,
+  );
   final commandRegistry = createDefaultCommandPalette(
     getAgentInfo: getAgentInfo,
     runPowerToolsCommand: runPowerToolsCommand,
@@ -130,6 +141,7 @@ AppDependencies createAppDependencies({
     updatePowerTools: updatePowerTools,
     installPowerTools: installPowerTools,
     installSystemService: installSystemService,
+    installCertificate: installCertificate,
   );
 
   return AppDependencies(

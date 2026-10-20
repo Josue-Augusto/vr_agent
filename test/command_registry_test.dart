@@ -2,10 +2,12 @@ import 'dart:io';
 
 import 'package:postgres/postgres.dart';
 import 'package:test/test.dart';
+import 'package:vr_agent/src/certificate/domain/repositories/certificate_installation_repository.dart';
 import 'package:vr_agent/src/connection/data/datasources/postgres_connection_datasource.dart';
 import 'package:vr_agent/src/connection/data/models/connection_model.dart';
 import 'package:vr_agent/src/core/tools/platform_info.dart';
 import 'package:vr_agent/src/di/injection.dart';
+import 'package:vr_agent/src/service/domain/repositories/system_service_installation_repository.dart';
 import 'package:vr_agent/src/terminal/data/repositories/power_tools_repository_impl.dart';
 import 'package:vr_agent/src/terminal/domain/entities/agent_command.dart';
 import 'package:vr_agent/src/terminal/domain/entities/power_tools_result.dart';
@@ -14,7 +16,6 @@ import 'package:vr_agent/src/terminal/domain/usecases/get_agent_info.dart';
 import 'package:vr_agent/src/terminal/domain/usecases/run_power_tools_command.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/command_registry.dart';
 import 'package:vr_agent/src/terminal/presentation/cli/power_tools_command.dart';
-import 'package:vr_agent/src/service/domain/repositories/system_service_installation_repository.dart';
 
 void main() {
   group('CommandRegistry', () {
@@ -249,6 +250,44 @@ exit 7
     expect(serviceInstallation.installed, isTrue);
   });
 
+  test('dependency injection routes certificate installation through its repository', () async {
+    final certificateInstallation = _FakeCertificateInstallationRepository();
+    final dependencies = createAppDependencies(
+      platformInfo: PlatformInfo.fromOperatingSystem('windows'),
+      connectionDatasource: _UnusedConnectionDatasource(),
+      certificateInstallationRepository: certificateInstallation,
+    );
+
+    expect(
+      await dependencies.commandRegistry.run([
+        '-a',
+        '-install',
+        '-certificate',
+      ]),
+      0,
+    );
+    expect(certificateInstallation.installedBytes, isNotEmpty);
+  });
+
+  test('certificate installation is rejected on Linux', () async {
+    final certificateInstallation = _FakeCertificateInstallationRepository();
+    final dependencies = createAppDependencies(
+      platformInfo: PlatformInfo.fromOperatingSystem('linux'),
+      connectionDatasource: _UnusedConnectionDatasource(),
+      certificateInstallationRepository: certificateInstallation,
+    );
+
+    expect(
+      await dependencies.commandRegistry.run([
+        '-a',
+        '-install',
+        '-certificate',
+      ]),
+      69,
+    );
+    expect(certificateInstallation.installedBytes, isNull);
+  });
+
   test('rejects service installation without the install selector', () async {
     final registry = CommandRegistry()
       ..register(
@@ -290,5 +329,14 @@ class _FakeSystemServiceInstallationRepository implements SystemServiceInstallat
   @override
   Future<void> install() async {
     installed = true;
+  }
+}
+
+class _FakeCertificateInstallationRepository implements CertificateInstallationRepository {
+  List<int>? installedBytes;
+
+  @override
+  Future<void> installCertificate(List<int> certificateBytes) async {
+    installedBytes = certificateBytes;
   }
 }

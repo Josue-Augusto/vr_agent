@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:vr_agent/src/certificate/domain/usecases/install_certificate.dart';
+import 'package:vr_agent/src/certificate/presentation/cli/install_certificate_command.dart';
 import 'package:vr_agent/src/crontab/domain/usecases/sync_crontab.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/crontab_command.dart';
 import 'package:vr_agent/src/crontab/presentation/cli/update_crontab_command.dart';
@@ -80,6 +82,7 @@ CommandRegistry createDefaultCommandPalette({
   UpdatePowerTools? updatePowerTools,
   InstallPowerTools? installPowerTools,
   InstallSystemService? installSystemService,
+  InstallCertificate? installCertificate,
 }) {
   final powerTools = PowerToolsCommand(runPowerToolsCommand);
   final registry = CommandRegistry(powerToolsAction: powerTools.call);
@@ -87,6 +90,7 @@ CommandRegistry createDefaultCommandPalette({
   final updatePowerToolsCommand = updatePowerTools == null ? null : UpdatePowerToolsCommand(updatePowerTools);
   final installPowerToolsCommand = installPowerTools == null ? null : InstallPowerToolsCommand(installPowerTools);
   final installSystemServiceCommand = installSystemService == null ? null : InstallSystemServiceCommand(installSystemService);
+  final installCertificateCommand = installCertificate == null ? null : InstallCertificateCommand(installCertificate);
 
   registry.register(
     AgentCommand(
@@ -105,10 +109,10 @@ CommandRegistry createDefaultCommandPalette({
   registry.register(
     AgentCommand(
       name: '-install',
-      description: 'Instala o serviço (-service) ou o PowerTools (-powertools).',
+      description: 'Instala o serviço (-service), o PowerTools (-powertools) ou o certificado (-certificate).',
       action: (arguments) async {
         if (arguments.length != 1) {
-          stderr.writeln('Uso: vr_agent -a -install <-service|-powertools>');
+          stderr.writeln('Uso: vr_agent -a -install <-service|-powertools|-certificate>');
           return 64;
         }
 
@@ -127,8 +131,15 @@ CommandRegistry createDefaultCommandPalette({
               return 1;
             }
             return command.call(const []);
+          case '-certificate':
+            final command = installCertificateCommand;
+            if (command == null) {
+              stderr.writeln('A instalação do certificado não está configurada.');
+              return 1;
+            }
+            return command.call(const []);
           default:
-            stderr.writeln('Uso: vr_agent -a -install <-service|-powertools>');
+            stderr.writeln('Uso: vr_agent -a -install <-service|-powertools|-certificate>');
             return 64;
         }
       },
